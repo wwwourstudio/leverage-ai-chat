@@ -53,7 +53,7 @@ function ActionBadge({ action }: { action?: string }) {
     <span className={cn(
       'flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border',
       isAdd
-        ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+        ? 'text-blue-300 bg-blue-500/15 border-blue-500/30'
         : 'text-red-300 bg-red-500/15 border-red-500/30',
     )}>
       {isAdd ? <PlusCircle className="w-2.5 h-2.5" /> : <MinusCircle className="w-2.5 h-2.5" />}
@@ -181,7 +181,7 @@ export const WaiverCard = memo(function WaiverCard({ data, isHero, ...p }: Fanta
                     )}
                     {/* Matchup favorable indicator */}
                     {t.matchupFavorable && (
-                      <span className="ml-auto text-[8px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
+                      <span className="ml-auto text-[8px] font-black uppercase text-blue-400 bg-blue-500/10 border border-blue-500/25 px-1.5 py-0.5 rounded-full">
                         ✓ Favorable Matchup
                       </span>
                     )}

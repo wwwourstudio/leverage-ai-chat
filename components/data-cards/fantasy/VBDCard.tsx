@@ -13,7 +13,7 @@ function VBDBar({ vbd, maxVbd }: { vbd: number; maxVbd: number }) {
   return (
     <div className="h-1.5 mx-2 mb-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
       <div
-        className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-emerald-400 transition-all duration-700"
+        className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-blue-400 transition-all duration-700"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -67,10 +67,10 @@ export const VBDCard = memo(function VBDCard({ data, isHero, ...p }: FantasyCard
                 <span className={cn(
                   'text-[11px] font-black tabular-nums w-10 text-right shrink-0 rounded-full px-1.5 py-0.5',
                   (pl.vbd ?? 0) >= 20
-                    ? 'text-emerald-300 bg-emerald-500/15'
+                    ? 'text-blue-300 bg-blue-500/15'
                     : (pl.vbd ?? 0) >= 10
                     ? 'text-teal-300 bg-teal-500/12'
-                    : 'text-emerald-400',
+                    : 'text-blue-400',
                 )}>
                   +{pl.vbd}
                 </span>

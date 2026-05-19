@@ -59,7 +59,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
             <div
               className={cn(
                 'text-2xl font-black tabular-nums mt-1.5',
-                homeIsFav ? 'text-cyan-300' : 'text-emerald-300',
+                homeIsFav ? 'text-cyan-300' : 'text-blue-300',
               )}
             >
               {event.bestAwayOdds ? formatAmericanOdds(event.bestAwayOdds.price) : '—'}
@@ -82,7 +82,7 @@ export function OddsCard({ event, onAsk }: OddsCardProps) {
             <div
               className={cn(
                 'text-2xl font-black tabular-nums mt-1.5',
-                homeIsFav ? 'text-emerald-300' : 'text-cyan-300',
+                homeIsFav ? 'text-blue-300' : 'text-cyan-300',
               )}
             >
               {event.bestHomeOdds ? formatAmericanOdds(event.bestHomeOdds.price) : '—'}

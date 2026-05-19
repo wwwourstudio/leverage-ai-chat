@@ -72,7 +72,7 @@ function RankCircle({ rank }: { rank: number }) {
   const c = rank <= 12
     ? 'bg-yellow-400/20 border-yellow-400/50 text-yellow-300 shadow-[0_0_8px_oklch(0.8_0.18_80/0.25)]'
     : rank <= 50
-    ? 'bg-emerald-400/15 border-emerald-400/40 text-emerald-300'
+    ? 'bg-blue-400/15 border-blue-400/40 text-blue-300'
     : rank <= 150
     ? 'bg-sky-400/15 border-sky-400/40 text-sky-300'
     : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-faint)]';
@@ -89,7 +89,7 @@ function RankCircle({ rank }: { rank: number }) {
 // ── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; dot: string; text: string; badgeCls: string; headerGrad: string }> = {
-  optimal: { label: 'OPTIMAL',  dot: 'bg-emerald-400', text: 'text-emerald-400', badgeCls: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', headerGrad: 'from-emerald-600/25 dark:via-teal-800/10' },
+  optimal: { label: 'OPTIMAL',  dot: 'bg-blue-400', text: 'text-blue-400', badgeCls: 'bg-blue-500/15 border-blue-500/30 text-blue-400', headerGrad: 'from-blue-600/25 dark:via-cyan-800/10' },
   value:   { label: 'VALUE',    dot: 'bg-cyan-400',    text: 'text-cyan-400',    badgeCls: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',           headerGrad: 'from-cyan-600/25 dark:via-teal-800/10' },
   target:  { label: 'TARGET',   dot: 'bg-teal-400',    text: 'text-teal-400',    badgeCls: 'bg-teal-500/15 border-teal-500/30 text-teal-400',           headerGrad: 'from-teal-600/25 dark:via-cyan-800/10' },
   hot:     { label: 'HOT',      dot: 'bg-red-400',     text: 'text-red-400',     badgeCls: 'bg-red-500/15 border-red-500/30 text-red-400',              headerGrad: 'from-red-600/25 dark:via-rose-800/10' },
@@ -194,7 +194,7 @@ export const ADPCard = memo(function ADPCard({
             {players.slice(0, maxRows).map((p, idx) => {
               const isTopPick = p.rank <= 12;
               const rowBg = p.isValuePick
-                ? 'bg-emerald-500/8 border-emerald-500/20'
+                ? 'bg-blue-500/8 border-blue-500/20'
                 : idx === 0
                 ? 'bg-indigo-500/8 border-indigo-500/15'
                 : isTopPick
@@ -226,7 +226,7 @@ export const ADPCard = memo(function ADPCard({
 
                   {/* Sleeper badge */}
                   {p.isValuePick && (
-                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 px-1.5 py-0.5 rounded-full shrink-0">
+                    <span className="text-[8px] font-black uppercase tracking-wider text-blue-400 bg-blue-400/10 border border-blue-400/25 px-1.5 py-0.5 rounded-full shrink-0">
                       SLEEPER
                     </span>
                   )}
@@ -252,7 +252,7 @@ export const ADPCard = memo(function ADPCard({
                       {p.adp.toFixed(1)}
                     </span>
                     {p.valueDelta != null && p.valueDelta > 0 && (
-                      <span className="text-[9px] font-black text-emerald-400 tabular-nums leading-none block">
+                      <span className="text-[9px] font-black text-blue-400 tabular-nums leading-none block">
                         +{p.valueDelta.toFixed(0)}
                       </span>
                     )}

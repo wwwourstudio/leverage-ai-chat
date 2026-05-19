@@ -7,7 +7,7 @@ import type { FileAttachment } from '@/lib/hooks/useFileHandling';
 import type { Chat } from '@/lib/hooks/useChatList';
 import type { Message } from '@/app/types/chat';
 import type { PromptItem } from '@/lib/prompt-data';
-import { useAppStore } from '@/lib/store/app-store';
+import { useAppStore, type AppCategory } from '@/lib/store/app-store';
 import { useUserStore } from '@/lib/store/user-store';
 import { useFantasyStore } from '@/lib/store/fantasy-store';
 import { useModalState } from '@/lib/hooks/useModalState';
@@ -101,7 +101,7 @@ export function ChatInputSection({
         <SuggestedPrompts
           showWelcomeGrid={messages.length === 1 && !!messages[0]?.isWelcome && suggestedPrompts.length === 0 && selectedCategory === 'all'}
           onWelcomeAction={onWelcomeAction}
-          onCategorySelect={selectCategory}
+          onCategorySelect={(categoryId: string) => selectCategory(categoryId as AppCategory)}
           suggestedPrompts={suggestedPrompts}
           quickActions={quickActions}
           hasMessages={messages.length > 1}

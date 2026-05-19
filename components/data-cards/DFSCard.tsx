@@ -49,7 +49,7 @@ interface DFSCardProps {
 function ValueGrade({ score }: { score: number }) {
   const grade = score >= 5.5 ? 'A' : score >= 4.5 ? 'B' : score >= 3.5 ? 'C' : 'D';
   const cls =
-    grade === 'A' ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/35'
+    grade === 'A' ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
     : grade === 'B' ? 'text-blue-300 bg-blue-500/15 border-blue-500/35'
     : grade === 'C' ? 'text-amber-300 bg-amber-500/15 border-amber-500/35'
     : 'text-red-300 bg-red-500/15 border-red-500/35';
@@ -69,7 +69,7 @@ function OwnershipBar({ pct }: { pct: number }) {
     ? { label: 'POPULAR',  bar: 'from-amber-500 to-yellow-400',  txt: 'text-amber-400',   badge: 'bg-amber-500/10 border-amber-500/25 text-amber-400' }
     : pct >= 10
     ? { label: 'MODERATE', bar: 'from-blue-500 to-indigo-400',   txt: 'text-blue-400',    badge: 'bg-blue-500/10 border-blue-500/25 text-blue-400' }
-    :  { label: 'LEVERAGE', bar: 'from-emerald-500 to-teal-400', txt: 'text-emerald-400', badge: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' };
+    :  { label: 'LEVERAGE', bar: 'from-blue-500 to-teal-400', txt: 'text-blue-400', badge: 'bg-blue-500/10 border-blue-500/25 text-blue-400' };
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -103,13 +103,13 @@ function CeilingFloorBar({ ceiling, floor, projection }: { ceiling: number; floo
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-red-400 tabular-nums">Floor {floor.toFixed(1)}</span>
           <span className="text-[var(--text-faint)] text-[9px]">–</span>
-          <span className="text-[10px] font-bold text-emerald-400 tabular-nums">Ceil {ceiling.toFixed(1)}</span>
+          <span className="text-[10px] font-bold text-blue-400 tabular-nums">Ceil {ceiling.toFixed(1)}</span>
         </div>
       </div>
       <div className="relative h-2 rounded-full overflow-visible">
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/30 via-amber-400/20 to-emerald-500/30" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/30 via-amber-400/20 to-blue-500/30" />
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-red-400/70" />
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-emerald-400/70" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-blue-400/70" />
         <div
           className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[var(--bg-elevated)] dark:bg-white border-2 border-[var(--cat-dfs,oklch(0.72_0.20_80))] shadow-[0_0_6px_oklch(0.72_0.20_80/0.5)] transition-all duration-500"
           style={{ left: `calc(${projPct}% - 5px)` }}
@@ -124,8 +124,8 @@ function CeilingFloorBar({ ceiling, floor, projection }: { ceiling: number; floo
 
 /** Matchup score meter */
 function MatchupMeter({ score }: { score: number }) {
-  const colorCls = score >= 70 ? 'from-emerald-500 to-teal-400' : score >= 50 ? 'from-amber-500 to-yellow-400' : 'from-red-500 to-rose-400';
-  const textCls  = score >= 70 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
+  const colorCls = score >= 70 ? 'from-blue-500 to-teal-400' : score >= 50 ? 'from-amber-500 to-yellow-400' : 'from-red-500 to-rose-400';
+  const textCls  = score >= 70 ? 'text-blue-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
   const label    = score >= 70 ? 'GREAT' : score >= 50 ? 'OK' : 'TOUGH';
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2.5 space-y-1.5">
@@ -139,7 +139,7 @@ function MatchupMeter({ score }: { score: number }) {
           <span className="text-[var(--text-faint)] text-[10px]">/100</span>
           <span className={cn(
             'inline-flex items-center px-1.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-wide',
-            score >= 70 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+            score >= 70 ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
               : score >= 50 ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
               : 'bg-red-500/15 border-red-500/30 text-red-400',
           )}>{label}</span>
@@ -224,7 +224,7 @@ export const DFSCard = memo(function DFSCard({
   );
 
   const categoryBadgeCls =
-    cardCategory === 'value'      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' :
+    cardCategory === 'value'      ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' :
     cardCategory === 'matchup'    ? 'bg-blue-500/15 border-blue-500/30 text-blue-400' :
     cardCategory === 'contrarian' ? 'bg-violet-500/15 border-violet-500/30 text-violet-400' :
     cardCategory === 'chalk'      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
@@ -255,8 +255,8 @@ export const DFSCard = memo(function DFSCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {realData && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold uppercase tracking-wide">
-                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />LIVE
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-bold uppercase tracking-wide">
+                <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />LIVE
               </span>
             )}
             {cardCategory && (
@@ -291,7 +291,7 @@ export const DFSCard = memo(function DFSCard({
                   {player}
                 </span>
                 {confirmedStarter && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-black text-emerald-400 uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[9px] font-black text-blue-400 uppercase tracking-wider">
                     <CheckCircle2 className="w-2.5 h-2.5" />Confirmed
                   </span>
                 )}
@@ -351,13 +351,13 @@ export const DFSCard = memo(function DFSCard({
             )}
             {/* Projection */}
             {hasVal(projection) && (
-              <div className="flex flex-col items-center gap-1 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2 py-2.5">
-                <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/70">Proj Pts</span>
-                <span className="text-base font-black text-emerald-400 tabular-nums leading-tight">{String(projection)}</span>
+              <div className="flex flex-col items-center gap-1 rounded-xl bg-blue-500/8 border border-blue-500/20 px-2 py-2.5">
+                <span className="text-[8px] font-black uppercase tracking-wider text-blue-400/70">Proj Pts</span>
+                <span className="text-base font-black text-blue-400 tabular-nums leading-tight">{String(projection)}</span>
                 {!isNaN(projNum) && projNum > 0 && (
                   <div className="w-full mt-0.5">
                     <div className="h-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ width: `${Math.min(100, (projNum / 40) * 100).toFixed(1)}%` }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-teal-400" style={{ width: `${Math.min(100, (projNum / 40) * 100).toFixed(1)}%` }} />
                     </div>
                   </div>
                 )}
@@ -373,7 +373,7 @@ export const DFSCard = memo(function DFSCard({
                     <div className="h-0.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                       <div
                         className={cn('h-full rounded-full transition-all duration-500',
-                          ownershipNum >= 35 ? 'bg-red-400' : ownershipNum >= 20 ? 'bg-amber-400' : ownershipNum >= 10 ? 'bg-blue-400' : 'bg-emerald-400'
+                          ownershipNum >= 35 ? 'bg-red-400' : ownershipNum >= 20 ? 'bg-amber-400' : ownershipNum >= 10 ? 'bg-blue-400' : 'bg-blue-400'
                         )}
                         style={{ width: `${Math.min(100, ownershipNum)}%` }}
                       />
@@ -394,7 +394,7 @@ export const DFSCard = memo(function DFSCard({
               {hasVal(projection) && (
                 <div className="flex flex-col items-center gap-0.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] px-1.5 py-2">
                   <span className="text-[7px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Proj Pts</span>
-                  <span className="text-sm font-black text-emerald-400 tabular-nums">{String(projection)}</span>
+                  <span className="text-sm font-black text-blue-400 tabular-nums">{String(projection)}</span>
                 </div>
               )}
               {hasVal(ownership) && (
@@ -422,8 +422,8 @@ export const DFSCard = memo(function DFSCard({
         {/* Value efficiency — compact row */}
         {!isStackPlay && hasCorePlay && valueScore !== null && (() => {
           const valPct = Math.min(100, (valueScore / 8) * 100);
-          const valCls = valueScore >= 5.5 ? 'from-emerald-500 to-teal-400' : valueScore >= 4.5 ? 'from-blue-500 to-indigo-400' : valueScore >= 3.5 ? 'from-amber-500 to-yellow-400' : 'from-red-500 to-rose-400';
-          const valTxt = valueScore >= 5.5 ? 'text-emerald-400' : valueScore >= 4.5 ? 'text-blue-400' : valueScore >= 3.5 ? 'text-amber-400' : 'text-red-400';
+          const valCls = valueScore >= 5.5 ? 'from-blue-500 to-teal-400' : valueScore >= 4.5 ? 'from-blue-500 to-indigo-400' : valueScore >= 3.5 ? 'from-amber-500 to-yellow-400' : 'from-red-500 to-rose-400';
+          const valTxt = valueScore >= 5.5 ? 'text-blue-400' : valueScore >= 4.5 ? 'text-blue-400' : valueScore >= 3.5 ? 'text-amber-400' : 'text-red-400';
           return (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -452,9 +452,9 @@ export const DFSCard = memo(function DFSCard({
         ) : (boomCeiling || bustFloor) && (
           <div className="grid grid-cols-2 gap-1.5">
             {boomCeiling && (
-              <div className="flex flex-col items-center gap-0.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20 px-2 py-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">Ceiling</span>
-                <span className="text-sm font-black text-emerald-400 tabular-nums">{String(boomCeiling)}</span>
+              <div className="flex flex-col items-center gap-0.5 rounded-xl bg-blue-500/8 border border-blue-500/20 px-2 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400/70">Ceiling</span>
+                <span className="text-sm font-black text-blue-400 tabular-nums">{String(boomCeiling)}</span>
               </div>
             )}
             {bustFloor && (
@@ -486,7 +486,7 @@ export const DFSCard = memo(function DFSCard({
                 {pts.map((pt, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
                     <div
-                      className={cn('w-full rounded-sm', pt >= max * 0.7 ? 'bg-emerald-500' : pt >= max * 0.4 ? 'bg-blue-500' : 'bg-red-500/60')}
+                      className={cn('w-full rounded-sm', pt >= max * 0.7 ? 'bg-blue-500' : pt >= max * 0.4 ? 'bg-blue-500' : 'bg-red-500/60')}
                       style={{ height: `${Math.round((pt / max) * 24) + 4}px` }}
                     />
                     <span className="text-[7px] text-[var(--text-faint)] tabular-nums">{pt.toFixed(0)}</span>
@@ -568,7 +568,7 @@ export const DFSCard = memo(function DFSCard({
             {parkFactorNum !== null && !isNaN(parkFactorNum!) && (
               <span className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
-                parkFactorNum! >= 1.05 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                parkFactorNum! >= 1.05 ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
                   : parkFactorNum! <= 0.96 ? 'bg-red-500/10 border-red-500/20 text-red-400'
                   : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)]',
               )}>

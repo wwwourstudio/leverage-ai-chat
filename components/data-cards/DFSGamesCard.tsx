@@ -109,7 +109,7 @@ function getBestSlateIndex(slates: EnrichedSlate[]): number {
 
 /** Slate type → badge config */
 function getSlateBadge(label: string, contestType: string, selected: boolean) {
-  if (selected) return { cls: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300', dot: true };
+  if (selected) return { cls: 'bg-blue-500/20 border-blue-500/40 text-blue-300', dot: true };
   const l = label.toLowerCase();
   if (contestType === 'showdown') return { cls: 'bg-violet-500/15 border-violet-500/30 text-violet-300', dot: false };
   if (l.includes('turbo'))        return { cls: 'bg-amber-500/15 border-amber-500/30 text-amber-300', dot: false };
@@ -248,8 +248,8 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
             <span className="text-[9px]">DFS Slates</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
-              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wide">
+              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
               LIVE
             </span>
             <Calendar className="w-3.5 h-3.5 text-[var(--cat-dfs,oklch(0.72_0.20_80))]/70" />
@@ -287,7 +287,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
           const hasGames     = games.length > 0;
 
           const leftBorderCls =
-            isSelected ? 'border-l-2 border-l-emerald-400'
+            isSelected ? 'border-l-2 border-l-blue-400'
             : isBestPlay ? 'border-l-2 border-l-[var(--cat-dfs,oklch(0.72_0.20_80))]'
             : slate.contestType === 'showdown' ? 'border-l-2 border-l-violet-500'
             : slate.slateLabel.toLowerCase().includes('main') ? 'border-l-2 border-l-indigo-400'
@@ -318,7 +318,7 @@ export const DFSGamesCard = memo(function DFSGamesCard({ data, onAsk }: DFSGames
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest shrink-0',
                   badge.cls,
                 )}>
-                  {badge.dot && <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />}
+                  {badge.dot && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />}
                   {slate.slateLabel}
                 </span>
 

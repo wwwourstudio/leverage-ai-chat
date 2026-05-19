@@ -100,28 +100,28 @@ export function OddsCell({ label, value, sub, positive, highlight, isBest }: {
     <div className={cn(
       'flex flex-col items-center gap-0.5 px-3 py-3 rounded-2xl border transition-all',
       isBest
-        ? 'bg-emerald-500/10 border-emerald-500/30 shadow-emerald-500/10 shadow-sm'
+        ? 'bg-blue-500/10 border-blue-500/30 shadow-blue-500/10 shadow-sm'
         : highlight
         ? 'bg-blue-500/10 border-blue-500/25'
         : isHeavyFav
         ? 'bg-red-500/6 border-red-500/15'
         : isUnderdog
-        ? 'bg-emerald-500/6 border-emerald-500/15'
+        ? 'bg-blue-500/6 border-blue-500/15'
         : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
     )}>
       <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-0.5">{label}</span>
       <span className={cn(
         'text-xl font-black tabular-nums leading-none',
-        isBest ? 'text-emerald-300'
+        isBest ? 'text-blue-300'
         : isHeavyFav ? 'text-red-400'
-        : isUnderdog ? 'text-emerald-400'
+        : isUnderdog ? 'text-blue-400'
         : 'text-white',
       )}>
         {value}
       </span>
       {sub && <span className="text-[9px] text-[var(--text-faint)] mt-0.5 text-center leading-tight">{sub}</span>}
       {isBest && (
-        <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-[8px] font-black text-emerald-400 uppercase tracking-wider">
+        <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[8px] font-black text-blue-400 uppercase tracking-wider">
           ★ BEST
         </span>
       )}
@@ -185,14 +185,14 @@ export function BookComparisonRow({
                 <span className={cn(
                   'text-sm font-black tabular-nums text-center',
                   !b.awayOdds ? 'text-[var(--text-faint)]'
-                  : n > 0 ? 'text-emerald-400'
+                  : n > 0 ? 'text-blue-400'
                   : 'text-white/80',
-                  isBest && 'text-emerald-300',
+                  isBest && 'text-blue-300',
                 )}>
                   {b.awayOdds ?? '—'}
                 </span>
                 {isBest && (
-                  <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>
+                  <span className="text-[7px] font-black text-blue-500 uppercase tracking-wider">BEST</span>
                 )}
               </div>
             );
@@ -215,14 +215,14 @@ export function BookComparisonRow({
                 <span className={cn(
                   'text-sm font-black tabular-nums text-center',
                   !b.homeOdds ? 'text-[var(--text-faint)]'
-                  : n > 0 ? 'text-emerald-400'
+                  : n > 0 ? 'text-blue-400'
                   : 'text-white/80',
-                  isBest && 'text-emerald-300',
+                  isBest && 'text-blue-300',
                 )}>
                   {b.homeOdds ?? '—'}
                 </span>
                 {isBest && (
-                  <span className="text-[7px] font-black text-emerald-500 uppercase tracking-wider">BEST</span>
+                  <span className="text-[7px] font-black text-blue-500 uppercase tracking-wider">BEST</span>
                 )}
               </div>
             );

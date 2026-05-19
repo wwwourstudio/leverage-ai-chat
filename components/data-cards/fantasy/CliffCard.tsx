@@ -33,7 +33,7 @@ export const CliffCard = memo(function CliffCard({ data, ...p }: FantasyCardProp
         'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border',
         hasCliffs
           ? 'bg-red-500/8 border-red-500/30'
-          : 'bg-emerald-500/8 border-emerald-500/30',
+          : 'bg-blue-500/8 border-blue-500/30',
       )}>
         {hasCliffs ? (
           <>
@@ -45,10 +45,10 @@ export const CliffCard = memo(function CliffCard({ data, ...p }: FantasyCardProp
           </>
         ) : (
           <>
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
             <div>
-              <p className="text-xs font-black text-emerald-300 uppercase tracking-widest">Safe Zone</p>
-              <p className="text-[9px] text-emerald-400/70 mt-0.5">No critical tier cliffs detected</p>
+              <p className="text-xs font-black text-blue-300 uppercase tracking-widest">Safe Zone</p>
+              <p className="text-[9px] text-blue-400/70 mt-0.5">No critical tier cliffs detected</p>
             </div>
           </>
         )}

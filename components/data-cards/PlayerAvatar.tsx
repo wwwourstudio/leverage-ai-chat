@@ -20,7 +20,7 @@ function sportAvatarColor(sport?: string): string {
   if (!sport) return 'bg-[var(--bg-surface)] text-foreground/80';
   const s = sport.toLowerCase();
   if (s.includes('basketball') || s === 'nba') return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
-  if (s.includes('football') || s === 'nfl') return 'bg-green-500/20 text-green-300 border-green-500/30';
+  if (s.includes('football') || s === 'nfl') return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
   if (s.includes('baseball') || s === 'mlb') return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
   if (s.includes('hockey') || s === 'nhl') return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
   return 'bg-purple-500/20 text-purple-300 border-purple-500/30';

@@ -55,7 +55,7 @@ export function ClosingLineCard({
 
   // CLV strength bar: map -30..+30 → 0..100%
   const clvBarPct = Math.min(100, Math.max(0, ((clv + 30) / 60) * 100));
-  const clvBarColor = clv >= 10 ? 'bg-emerald-500' : clv >= 0 ? 'bg-blue-500' : 'bg-red-500';
+  const clvBarColor = clv >= 10 ? 'bg-blue-500' : clv >= 0 ? 'bg-blue-500' : 'bg-red-500';
   const clvStrength = Math.abs(clv) >= 15 ? 'STRONG' : Math.abs(clv) >= 5 ? 'MODERATE' : 'WEAK';
 
   // Implied probability bars
@@ -65,7 +65,7 @@ export function ClosingLineCard({
   const closeImplied = !isNaN(closeOddsNum) && closeOddsNum !== 0 ? impliedProbFromAmerican(closeOddsNum) : null;
 
   const verdictConfig = {
-    'beat close':   { icon: CheckCircle2, color: 'text-emerald-400', badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', label: 'BEAT CLOSE', verdictBg: 'from-emerald-600/25 dark:via-emerald-900/10' },
+    'beat close':   { icon: CheckCircle2, color: 'text-blue-400', badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300', label: 'BEAT CLOSE', verdictBg: 'from-blue-600/25 dark:via-blue-900/10' },
     'at close':     { icon: MinusCircle,  color: 'text-slate-400',   badge: 'bg-slate-500/10   border-slate-500/30   text-slate-400',   label: 'AT CLOSE',   verdictBg: 'from-slate-600/20 dark:via-slate-900/10' },
     'missed close': { icon: XCircle,      color: 'text-red-400',     badge: 'bg-red-500/15     border-red-500/40     text-red-400',     label: 'MISSED CLV', verdictBg: 'from-red-600/25 dark:via-red-900/10' },
   }[verdict] ?? { icon: MinusCircle, color: 'text-slate-400', badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400', label: 'AT CLOSE', verdictBg: 'from-slate-600/20 dark:via-slate-900/10' };
@@ -83,7 +83,7 @@ export function ClosingLineCard({
       <div
         className={cn(
           'absolute inset-0 bg-gradient-to-br opacity-60 pointer-events-none',
-          'from-emerald-600/25 dark:via-teal-800/10 to-transparent',
+          'from-blue-600/25 dark:via-teal-800/10 to-transparent',
         )}
         aria-hidden="true"
       />
@@ -92,7 +92,7 @@ export function ClosingLineCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2 min-w-0">
-            <BarChart2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+            <BarChart2 className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{category}</span>
@@ -202,7 +202,7 @@ export function ClosingLineCard({
                 <span className="text-[var(--text-faint)] w-12 shrink-0">Closing</span>
                 <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-overlay)] overflow-hidden">
                   <div className={cn('h-full rounded-full transition-all duration-500',
-                    verdict === 'beat close' ? 'bg-emerald-500/70' : verdict === 'missed close' ? 'bg-red-500/70' : 'bg-slate-500/60'
+                    verdict === 'beat close' ? 'bg-blue-500/70' : verdict === 'missed close' ? 'bg-red-500/70' : 'bg-slate-500/60'
                   )} style={{ width: `${Math.min(100, closeImplied * 150)}%` }} />
                 </div>
                 <span className={cn('font-black w-10 text-right tabular-nums', verdictConfig.color)}>{(closeImplied * 100).toFixed(1)}%</span>
@@ -243,7 +243,7 @@ export function ClosingLineCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-emerald-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-blue-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             CLV History
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

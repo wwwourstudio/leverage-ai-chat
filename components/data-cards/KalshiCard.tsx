@@ -40,7 +40,7 @@ interface CategoryConfig { accent: string; headerGrad: string; }
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   election:      { accent: '#3b82f6', headerGrad: 'from-blue-500/10 dark:from-blue-600/80 dark:via-blue-700/60 dark:to-blue-900/40' },
   politics:      { accent: '#3b82f6', headerGrad: 'from-blue-500/10 dark:from-blue-600/80 dark:via-blue-700/60 dark:to-blue-900/40' },
-  sports:        { accent: '#10b981', headerGrad: 'from-emerald-500/10 dark:from-emerald-600/80 dark:via-emerald-700/60 dark:to-emerald-900/40' },
+  sports:        { accent: '#8b5cf6', headerGrad: 'from-violet-500/10 dark:from-violet-600/80 dark:via-violet-700/60 dark:to-violet-900/40' },
   weather:       { accent: '#22d3ee', headerGrad: 'from-cyan-500/10 dark:from-cyan-600/80 dark:via-cyan-700/60 dark:to-cyan-900/40' },
   finance:       { accent: '#f59e0b', headerGrad: 'from-amber-500/10 dark:from-amber-600/80 dark:via-amber-700/60 dark:to-amber-900/40' },
   crypto:        { accent: '#8b5cf6', headerGrad: 'from-violet-500/10 dark:from-violet-600/80 dark:via-violet-700/60 dark:to-violet-900/40' },
@@ -276,10 +276,10 @@ function ProbabilityHero({
         <div className={cn(
           'flex-1 flex flex-col items-center justify-center gap-1 py-3.5 px-3 rounded-xl border transition-all duration-300',
           yesLeads
-            ? 'bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_16px_rgba(0,209,93,0.08)]'
+            ? 'bg-blue-500/10 border-blue-500/25 shadow-[0_0_16px_rgba(0,209,93,0.08)]'
             : 'bg-[var(--bg-overlay)] border-[var(--border-subtle)]',
         )}>
-          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-400/60">Yes</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-blue-400/60">Yes</span>
           <div className="flex items-baseline gap-1">
             <span
               className={cn('tabular-nums font-black leading-none tracking-tight',
@@ -288,9 +288,9 @@ function ProbabilityHero({
             >
               {yesPct}
             </span>
-            <span className="text-xs font-bold mb-0.5 text-emerald-400/50">¢</span>
+            <span className="text-xs font-bold mb-0.5 text-blue-400/50">¢</span>
           </div>
-          <span className="text-[9px] font-semibold tabular-nums text-emerald-400/40">
+          <span className="text-[9px] font-semibold tabular-nums text-blue-400/40">
             {yesPct}% implied
           </span>
           {lastPrice != null && lastPrice > 0 && lastPrice !== yesPct && (
@@ -354,7 +354,7 @@ function ProbabilityHero({
           <div className="absolute left-1/2 -translate-x-px top-0 h-full w-0.5 bg-[var(--bg-elevated)]" />
         </div>
         <div className="flex justify-between text-[9px] font-semibold">
-          <span className="text-emerald-500/50">0¢</span>
+          <span className="text-blue-500/50">0¢</span>
           <span className="text-[var(--text-faint)]">50¢</span>
           <span className="text-rose-500/50">100¢</span>
         </div>
@@ -380,9 +380,9 @@ function OrderBookMini({
     <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)]">
       {/* Header row */}
       <div className="grid grid-cols-2 border-b border-[var(--border-subtle)]">
-        <div className="px-3 py-1.5 flex items-center gap-1.5 border-r border-[var(--border-subtle)] bg-emerald-500/5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400/70">Bids (YES)</span>
+        <div className="px-3 py-1.5 flex items-center gap-1.5 border-r border-[var(--border-subtle)] bg-blue-500/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500/60" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-blue-400/70">Bids (YES)</span>
         </div>
         <div className="px-3 py-1.5 flex items-center gap-1.5 bg-rose-500/5">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500/60" />
@@ -397,13 +397,13 @@ function OrderBookMini({
               key={i}
               className={cn(
                 'relative flex items-center justify-between text-[10px] tabular-nums rounded-md overflow-hidden px-2 py-1 animate-fade-in-up',
-                i % 2 === 0 ? 'bg-emerald-500/4' : '',
+                i % 2 === 0 ? 'bg-blue-500/4' : '',
               )}
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="absolute inset-0 rounded-md"
                    style={{ backgroundColor: YES_COLOR + '0a', width: `${(row.quantity / maxQty) * 100}%`, transition: 'width 600ms' }} />
-              <span className="relative font-bold z-10 text-emerald-400">{row.price}¢</span>
+              <span className="relative font-bold z-10 text-blue-400">{row.price}¢</span>
               <span className="relative text-[9px] z-10 text-[var(--text-faint)]">{row.quantity.toLocaleString('en-US')}</span>
             </div>
           ))}
@@ -462,9 +462,9 @@ function PriceChips({
       </div>
       <div className="grid grid-cols-2 gap-2">
         {yesBuy != null && yesBuy > 0 && (
-          <div className="flex flex-col items-center py-3 px-2 rounded-xl text-[14px] font-black tabular-nums bg-emerald-500/10 border border-emerald-500/20">
-            <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-emerald-400/60">Yes ask</span>
-            <span className="text-emerald-400">{yesBuy}¢</span>
+          <div className="flex flex-col items-center py-3 px-2 rounded-xl text-[14px] font-black tabular-nums bg-blue-500/10 border border-blue-500/20">
+            <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-blue-400/60">Yes ask</span>
+            <span className="text-blue-400">{yesBuy}¢</span>
           </div>
         )}
         {noBuy != null && noBuy > 0 && (
@@ -527,7 +527,7 @@ function StatsRow({
   );
 }
 
-// ── Time Bar ───────────────────────────────────────────────────────────────────
+// ── Time Bar ───────────────��───────────────────────────────────────────────────
 
 function TimeBar({ closeTimeIso }: { closeTimeIso?: string | null }) {
   const { label, pctElapsed, urgency } = timeRemaining(closeTimeIso);
@@ -850,7 +850,7 @@ function TabDepth({
       {isActive && hasPrices && (
         <div className={cn(
           'rounded-xl transition-colors duration-700',
-          priceFlash ? 'bg-emerald-500/8' : 'bg-transparent',
+          priceFlash ? 'bg-blue-500/8' : 'bg-transparent',
         )}>
           <PriceChips
             yesBid={yesBid} yesAsk={yesAsk}
@@ -1408,7 +1408,7 @@ export const KalshiCard = memo(function KalshiCard({
                 href={tradeBase}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/yes flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                className="group/yes flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-xl text-[11px] font-black tracking-wide transition-all duration-150 bg-blue-500/10 border border-blue-500/20 text-blue-400"
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = 'rgba(0,209,93,0.18)';
                   e.currentTarget.style.borderColor = 'rgba(0,209,93,0.40)';

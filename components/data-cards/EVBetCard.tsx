@@ -42,7 +42,7 @@ export function EVBetCard({
 }: EVBetCardProps) {
   const conf = data.confidence ?? 'medium';
   const confColors = {
-    high:   'text-emerald-300 bg-emerald-500/15 border-emerald-500/40',
+    high:   'text-blue-300 bg-blue-500/15 border-blue-500/40',
     medium: 'text-amber-300   bg-amber-500/10   border-amber-500/35',
     low:    'text-slate-400   bg-slate-500/10   border-slate-500/30',
   };
@@ -50,13 +50,13 @@ export function EVBetCard({
   const evRaw = parseFloat(String(data.evPercent ?? '0'));
   const isPositiveEV = evRaw > 0;
   const evColorClass =
-    evRaw >= 10 ? 'text-emerald-300'
+    evRaw >= 10 ? 'text-blue-300'
     : evRaw >= 5  ? 'text-amber-300'
     : evRaw > 0   ? 'text-sky-300'
     : 'text-red-400';
 
   const evBgClass =
-    evRaw >= 5  ? 'from-emerald-600/25 dark:via-cyan-800/10 to-transparent'
+    evRaw >= 5  ? 'from-blue-600/25 dark:via-cyan-800/10 to-transparent'
     : evRaw > 0 ? 'from-sky-600/20 dark:via-cyan-800/8 to-transparent'
     : 'from-red-600/15 dark:via-slate-800/5 to-transparent';
 
@@ -79,13 +79,13 @@ export function EVBetCard({
       <div className={cn('absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b', gradient)} aria-hidden="true" />
 
       {/* EV banner */}
-      <div className="relative flex items-center justify-between px-4 py-2 border-b border-emerald-700/20 bg-emerald-900/10">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-400">
+      <div className="relative flex items-center justify-between px-4 py-2 border-b border-blue-700/20 bg-blue-900/10">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-400">
           <TrendingUp className="w-3 h-3 shrink-0" aria-hidden="true" />
           Positive Expected Value Bet
         </div>
         {isPositiveEV && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wide">
             EDGE
           </span>
         )}
@@ -117,7 +117,7 @@ export function EVBetCard({
             {data.evPercent ?? '—'}
           </p>
           {edgePct !== null && (
-            <p className={cn('text-sm font-bold mt-1.5 tabular-nums', edgePct > 0 ? 'text-emerald-400' : 'text-red-400')}>
+            <p className={cn('text-sm font-bold mt-1.5 tabular-nums', edgePct > 0 ? 'text-blue-400' : 'text-red-400')}>
               {edgePct > 0 ? '+' : ''}{edgePct.toFixed(1)}% edge
             </p>
           )}
@@ -136,7 +136,7 @@ export function EVBetCard({
           <div className="mb-4">
             <div className="flex items-center gap-2 py-2">
               <div className="flex-1 text-center rounded-xl bg-[var(--bg-elevated)] p-2.5 border border-[var(--border-subtle)]">
-                <div className="text-xl font-black text-emerald-300 tabular-nums">{modelPct.toFixed(1)}%</div>
+                <div className="text-xl font-black text-blue-300 tabular-nums">{modelPct.toFixed(1)}%</div>
                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Model Prob</div>
               </div>
               <div className="text-[var(--text-faint)] text-xs font-bold">vs</div>
@@ -153,7 +153,7 @@ export function EVBetCard({
               </div>
               <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                  className="h-full rounded-full bg-blue-500 transition-all duration-700"
                   style={{ width: `${Math.min(100, modelPct)}%` }}
                 />
               </div>
@@ -201,7 +201,7 @@ export function EVBetCard({
         </div>
 
         {data.description && (
-          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-3 py-2 mt-3 text-[10px] text-[var(--text-muted)] leading-relaxed">
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 px-3 py-2 mt-3 text-[10px] text-[var(--text-muted)] leading-relaxed">
             {data.description}
           </div>
         )}
@@ -213,7 +213,7 @@ export function EVBetCard({
         {onAnalyze && (
           <button
             onClick={onAnalyze}
-            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-emerald-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
+            className="flex items-center justify-center gap-1.5 w-full mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)] hover:text-blue-400 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg py-2"
           >
             <Zap className="w-3 h-3" aria-hidden="true" />
             Full EV Analysis

@@ -32,7 +32,7 @@ interface PitchMatchupCardProps {
 }
 
 const ADV_CONFIG = {
-  batter:  { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', header: 'dark:from-emerald-900/30 dark:via-green-900/10',   label: 'Batter Edge',  icon: 'text-emerald-400' },
+  batter:  { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300', header: 'dark:from-blue-900/30 dark:via-blue-900/10',   label: 'Batter Edge',  icon: 'text-blue-400' },
   pitcher: { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             header: 'dark:from-red-900/30 dark:via-rose-900/10',        label: 'Pitcher Edge', icon: 'text-red-400'     },
   neutral: { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       header: 'dark:from-purple-900/25 dark:via-violet-900/10',   label: 'Neutral',      icon: 'text-purple-400'  },
 };
@@ -40,7 +40,7 @@ const ADV_CONFIG = {
 const PITCH_COLORS: Record<string, string> = {
   FF: 'bg-red-500/70', FT: 'bg-orange-500/70', SI: 'bg-orange-400/70',
   FC: 'bg-amber-500/70', SL: 'bg-blue-500/70', ST: 'bg-sky-400/70',
-  CH: 'bg-emerald-500/70', FS: 'bg-teal-500/70', CB: 'bg-yellow-500/70',
+  CH: 'bg-blue-500/70', FS: 'bg-teal-500/70', CB: 'bg-yellow-500/70',
   CU: 'bg-yellow-500/70', KC: 'bg-yellow-400/70',
 };
 
@@ -56,11 +56,11 @@ export function PitchMatchupCard({
   const cfg = ADV_CONFIG[advantage];
   const edge = Number(data.compositeEdge ?? 0);
   const edgeStr = edge >= 0 ? `+${edge.toFixed(1)}` : edge.toFixed(1);
-  const edgeColor = edge >= 1.5 ? 'text-emerald-400' : edge <= -1.5 ? 'text-red-400' : 'text-[var(--foreground)]';
+  const edgeColor = edge >= 1.5 ? 'text-blue-400' : edge <= -1.5 ? 'text-red-400' : 'text-[var(--foreground)]';
 
   const spinNum = Number(data.pitcherSpinRate ?? 0);
   const spinLabel = spinNum > 2500 ? 'elite' : spinNum > 2200 ? 'avg' : 'low';
-  const spinColor = spinNum > 2500 ? 'text-emerald-400' : spinNum > 2200 ? 'text-[var(--text-secondary,var(--text-muted))]' : 'text-amber-400';
+  const spinColor = spinNum > 2500 ? 'text-blue-400' : spinNum > 2200 ? 'text-[var(--text-secondary,var(--text-muted))]' : 'text-amber-400';
 
   let mixEntries: [string, string][] = [];
   try {

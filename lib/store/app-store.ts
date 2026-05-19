@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 type SystemStatus = 'ok' | 'degraded' | 'down';
-export type AppCategory = 'all' | 'betting' | 'kalshi' | 'dfs' | 'fantasy';
+export type AppCategory = 'all' | 'betting' | 'kalshi' | 'dfs' | 'fantasy' | 'props';
 
 interface AppStore {
   // Sidebar

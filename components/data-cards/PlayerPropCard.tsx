@@ -53,14 +53,14 @@ export function PlayerPropCard({ data, category, gradient, onAnalyze, isHero }: 
     ? hitRate >= 60 ? 'OVER LEAN' : hitRate >= 45 ? 'NEUTRAL' : 'UNDER LEAN'
     : '';
   const hitLabelStyle = hasHitRate
-    ? hitRate >= 60 ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300'
+    ? hitRate >= 60 ? 'bg-blue-500/15 border-blue-500/25 text-blue-300'
     : hitRate >= 45 ? 'bg-amber-500/15 border-amber-500/25 text-amber-300'
     : 'bg-red-500/15 border-red-500/25 text-red-300'
     : '';
 
   // Odds pill styling: positive = value (green), negative = chalk (slate)
-  const overStyle  = !isNaN(overNum)  && overNum  > 0 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-white/70';
-  const underStyle = !isNaN(underNum) && underNum > 0 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-white/70';
+  const overStyle  = !isNaN(overNum)  && overNum  > 0 ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-white/5 border-white/10 text-white/70';
+  const underStyle = !isNaN(underNum) && underNum > 0 ? 'bg-blue-500/15 border-blue-500/30 text-blue-300' : 'bg-white/5 border-white/10 text-white/70';
 
   return (
     <article className={cn(

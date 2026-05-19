@@ -44,8 +44,8 @@ function getTier(player: PlayerResult): { label: string; style: string; gradient
   if (isValue || (player.value_delta != null && player.value_delta >= 10)) {
     return {
       label: 'VALUE',
-      style: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300',
-      gradient: 'from-emerald-600/25 dark:via-emerald-800/10 to-transparent',
+      style: 'bg-blue-500/15 border-blue-500/30 text-blue-300',
+      gradient: 'from-blue-600/25 dark:via-blue-800/10 to-transparent',
     };
   }
   if (adp <= 24) {
@@ -121,13 +121,13 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
             <div className={cn(
               'flex-1 rounded-2xl border p-3 text-center',
               valueDeltaPositive
-                ? 'bg-emerald-500/12 border-emerald-500/25'
+                ? 'bg-blue-500/12 border-blue-500/25'
                 : 'bg-red-500/10 border-red-500/20',
             )}>
               <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Value Δ</p>
               <p className={cn(
                 'text-2xl font-black tabular-nums',
-                valueDeltaPositive ? 'text-emerald-400' : 'text-red-400',
+                valueDeltaPositive ? 'text-blue-400' : 'text-red-400',
               )}>
                 {valueDeltaPositive ? '+' : ''}{player.value_delta.toFixed(1)}
               </p>
@@ -135,9 +135,9 @@ export function PlayerCard({ player, onAsk, variant = 'default' }: PlayerCardPro
           )}
 
           {player.is_value_pick && player.value_delta == null && (
-            <div className="flex-1 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 p-3 text-center">
+            <div className="flex-1 rounded-2xl bg-blue-500/12 border border-blue-500/25 p-3 text-center">
               <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)] mb-1">Signal</p>
-              <p className="text-sm font-black text-emerald-400">VALUE</p>
+              <p className="text-sm font-black text-blue-400">VALUE</p>
             </div>
           )}
         </div>

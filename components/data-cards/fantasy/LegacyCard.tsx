@@ -57,7 +57,7 @@ export const LegacyCard = memo(function LegacyCard({ title, category, subcategor
         {stats.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
             {stats.map((s2, i) => {
-              const accentCls = i === 0 ? 'text-violet-300' : i === 1 ? 'text-purple-300' : 'text-emerald-300';
+              const accentCls = i === 0 ? 'text-violet-300' : i === 1 ? 'text-purple-300' : 'text-blue-300';
               return (
                 <div key={s2.label} className="flex flex-col items-center gap-0.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] p-2.5 text-center">
                   <span className="text-[8px] font-bold uppercase tracking-wider text-[var(--text-faint)]">{s2.label}</span>

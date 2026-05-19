@@ -57,7 +57,7 @@ function MetricTile({
       <p className="text-[8px] uppercase tracking-widest text-[var(--text-faint)]">{label}</p>
       <div className="flex items-end gap-1.5">
         <p className={cn('text-lg font-black tabular-nums leading-none', valueClass)}>{value}</p>
-        {trend === 'up' && <TrendingUp className="w-3.5 h-3.5 text-emerald-400 mb-0.5 shrink-0" />}
+        {trend === 'up' && <TrendingUp className="w-3.5 h-3.5 text-blue-400 mb-0.5 shrink-0" />}
         {trend === 'down' && <TrendingDown className="w-3.5 h-3.5 text-red-400 mb-0.5 shrink-0" />}
         {trend === 'flat' && <Minus className="w-3.5 h-3.5 text-[var(--text-muted)] mb-0.5 shrink-0" />}
       </div>
@@ -82,12 +82,12 @@ export function PortfolioCard({
   const utilColor =
     utilNum !== null && utilNum > 80 ? 'bg-red-500' :
     utilNum !== null && utilNum > 50 ? 'bg-amber-500' :
-    'bg-emerald-500';
+    'bg-blue-500';
 
   const utilTextColor =
     utilNum !== null && utilNum > 80 ? 'text-red-400' :
     utilNum !== null && utilNum > 50 ? 'text-amber-400' :
-    'text-emerald-400';
+    'text-blue-400';
 
   const roiTrend: 'up' | 'down' | 'flat' =
     roiNum === null ? 'flat'
@@ -97,7 +97,7 @@ export function PortfolioCard({
 
   const roiValueClass =
     roiNum === null ? 'text-white'
-    : roiNum > 0 ? 'text-emerald-300'
+    : roiNum > 0 ? 'text-blue-300'
     : roiNum < 0 ? 'text-red-400'
     : 'text-[var(--text-muted)]';
 
@@ -152,7 +152,7 @@ export function PortfolioCard({
               <MetricTile
                 label="Deployed"
                 value={data.deployed ?? '—'}
-                valueClass="text-emerald-300"
+                valueClass="text-blue-300"
                 subtext="active positions"
               />
               <MetricTile
@@ -216,7 +216,7 @@ export function PortfolioCard({
               <div className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-semibold',
                 roiNum > 0
-                  ? 'bg-emerald-500/8 border-emerald-500/20 text-emerald-300'
+                  ? 'bg-blue-500/8 border-blue-500/20 text-blue-300'
                   : roiNum < 0
                     ? 'bg-red-500/8 border-red-500/20 text-red-300'
                     : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-faint)]',

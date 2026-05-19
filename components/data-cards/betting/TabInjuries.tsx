@@ -151,11 +151,11 @@ export function TabInjuries({ data, onAnalyze, onAsk, loading = false }: {
 
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-        <Shield className="w-6 h-6 text-emerald-400" />
+      <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+        <Shield className="w-6 h-6 text-blue-400" />
       </div>
       <div>
-        <p className="text-[11px] font-bold text-emerald-400">No injury reports</p>
+        <p className="text-[11px] font-bold text-blue-400">No injury reports</p>
         <p className="text-[10px] text-[var(--text-faint)] mt-0.5">All players healthy for this game</p>
       </div>
       {onAnalyze && (

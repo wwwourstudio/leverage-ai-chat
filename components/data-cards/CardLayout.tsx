@@ -23,7 +23,7 @@ type StatusFilter = 'all' | 'hot' | 'value' | 'optimal';
 const STATUS_FILTERS: { id: StatusFilter; label: string; color: string }[] = [
   { id: 'all',     label: 'All',     color: 'text-[var(--text-muted)] bg-[var(--bg-elevated)]' },
   { id: 'hot',     label: 'Hot',     color: 'text-red-400 bg-red-500/10 border-red-500/20' },
-  { id: 'value',   label: 'Value',   color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  { id: 'value',   label: 'Value',   color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
   { id: 'optimal', label: 'Optimal', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
 ];
 

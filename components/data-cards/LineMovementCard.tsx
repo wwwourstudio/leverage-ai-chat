@@ -45,9 +45,9 @@ export function LineMovementCard({
   const isUp = data.direction === 'UP';
   const hasMovement = !!(data.oldLine && data.newLine);
 
-  const movColor = isUp ? 'text-emerald-400' : 'text-red-400';
+  const movColor = isUp ? 'text-blue-400' : 'text-red-400';
   const movBg = isUp
-    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+    ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
     : 'bg-red-500/15 border-red-500/30 text-red-300';
 
   // Parse sharp money percentage

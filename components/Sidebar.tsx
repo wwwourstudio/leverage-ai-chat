@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
-import { useAppStore } from '@/lib/store/app-store';
+import { useAppStore, type AppCategory } from '@/lib/store/app-store';
 import { useUserStore } from '@/lib/store/user-store';
 import { useModalState } from '@/lib/hooks/useModalState';
 
@@ -79,7 +79,7 @@ function activeSportColor(category: string): string {
 function tagAccentClass(tags: string[]): string {
   const first = (tags[0] ?? '').toLowerCase();
   if (first === 'betting' || first === 'multi-platform') return 'border-l-2 border-l-blue-500/60';
-  if (first === 'fantasy')  return 'border-l-2 border-l-emerald-500/60';
+  if (first === 'fantasy')  return 'border-l-2 border-l-violet-500/60';
   if (first === 'dfs')      return 'border-l-2 border-l-yellow-500/60';
   if (first === 'kalshi')   return 'border-l-2 border-l-cyan-500/60';
   if (first === 'mlb')      return 'border-l-2 border-l-red-500/60';
@@ -193,7 +193,7 @@ const ChatCard = memo(function ChatCard({
                   onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
                   className="p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all"
                 >
-                  <CheckCircle className="w-3 h-3 text-emerald-400" />
+                  <CheckCircle className="w-3 h-3 text-blue-400" />
                 </button>
               </div>
             ) : (
@@ -291,7 +291,7 @@ function IconRail({
           return (
             <button
               key={cat.id}
-              onClick={() => selectCategory(cat.id)}
+              onClick={() => selectCategory(cat.id as AppCategory)}
               title={cat.name}
               className={cn(
                 'w-full h-9 rounded-xl flex items-center justify-center transition-all duration-200',
@@ -417,7 +417,7 @@ export function Sidebar({
   const activeCategory = categories.find(c => c.id === selectedCategory);
 
   function handleCategorySelect(catId: string) {
-    selectCategory(catId);
+    selectCategory(catId as AppCategory);
     if (catId !== 'kalshi') setSelectedKalshiTopic('');
     setSuggestedPrompts([]);
     setLastUserQuery('');

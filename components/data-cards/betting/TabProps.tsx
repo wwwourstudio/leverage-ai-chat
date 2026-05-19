@@ -79,7 +79,7 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
               const hitRate = parseFloat(p.hitRate);
               const hasHitRate = p.hitRate != null && !isNaN(hitRate);
               const hitColor = hasHitRate
-                ? hitRate >= 65 ? 'bg-emerald-500' : hitRate <= 35 ? 'bg-red-500' : 'bg-amber-500'
+                ? hitRate >= 65 ? 'bg-blue-500' : hitRate <= 35 ? 'bg-red-500' : 'bg-amber-500'
                 : 'bg-[var(--bg-elevated)]';
               const handleClick = onAsk
                 ? () => onAsk(`Show me the prop card for ${p.player} ${p.stat} ${p.line} — analysis, hit rate, and betting value`)
@@ -109,7 +109,7 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
                           </div>
                           <span className={cn(
                             'text-[9px] font-black tabular-nums',
-                            hitRate >= 65 ? 'text-emerald-400' : hitRate <= 35 ? 'text-red-400' : 'text-amber-400',
+                            hitRate >= 65 ? 'text-blue-400' : hitRate <= 35 ? 'text-red-400' : 'text-amber-400',
                           )}>
                             {p.hitRate}%
                           </span>
@@ -123,7 +123,7 @@ export function TabProps({ data, onAnalyze, onAsk, loading = false }: {
                     <span className={cn(
                       'shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-black border tabular-nums',
                       !isNaN(oddsNum) && oddsNum > 0
-                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                        ? 'bg-blue-500/10 text-blue-300 border-blue-500/25'
                         : 'bg-red-500/8 text-red-300 border-red-500/20',
                     )}>
                       {!isNaN(oddsNum) && oddsNum > 0 ? `+${p.odds}` : p.odds}

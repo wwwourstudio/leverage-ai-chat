@@ -54,7 +54,7 @@ function impliedFromProb(prob: number): number {
 }
 
 const CONFIDENCE_CONFIG = {
-  high:   { label: 'HIGH',   color: 'text-emerald-300', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
+  high:   { label: 'HIGH',   color: 'text-blue-300', bg: 'bg-blue-500/15', border: 'border-blue-500/30' },
   medium: { label: 'MEDIUM', color: 'text-amber-300',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30'   },
   low:    { label: 'LOW',    color: 'text-rose-300',    bg: 'bg-rose-500/15',     border: 'border-rose-500/30'   },
 };
@@ -184,8 +184,8 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
             <p className="text-3xl font-black text-[var(--foreground)] tabular-nums" style={{ color: heroColor }}>{fmtOdds(modelOdds)}</p>
           </div>
           {kellyRec !== null && (
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25">
-              <span className="text-[9px] font-black text-emerald-400">1/4 Kelly: {(kellyRec * 100).toFixed(1)}% stake</span>
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/15 border border-blue-500/25">
+              <span className="text-[9px] font-black text-blue-400">1/4 Kelly: {(kellyRec * 100).toFixed(1)}% stake</span>
             </div>
           )}
         </div>
@@ -194,13 +194,13 @@ export const HRPredictionCard = memo(function HRPredictionCard({ data }: HRPredi
         {hasEdge ? (
           <div className={`shrink-0 text-center px-3 py-2.5 rounded-xl border ${
             edgePositive
-              ? 'bg-emerald-500/10 border-emerald-500/25'
+              ? 'bg-blue-500/10 border-blue-500/25'
               : 'bg-rose-500/10 border-rose-500/25'
           }`}>
             <p className="text-[8px] font-black uppercase tracking-wider mb-0.5" style={{ color: edgePositive ? '#6ee7b7' : '#fda4af' }}>
               {edgePositive ? 'EDGE' : 'FADE'}
             </p>
-            <p className={`text-lg font-black tabular-nums ${edgePositive ? 'text-emerald-300' : 'text-rose-300'}`}>
+            <p className={`text-lg font-black tabular-nums ${edgePositive ? 'text-blue-300' : 'text-rose-300'}`}>
               {fmtEdge(data.edge)}
             </p>
             <p className="text-[8px] text-[var(--foreground)]/30 mt-0.5">mkt: {fmtOdds(data.impliedOdds)}</p>

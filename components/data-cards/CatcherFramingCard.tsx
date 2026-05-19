@@ -30,7 +30,7 @@ interface CatcherFramingCardProps {
 }
 
 const TIER_CONFIG = {
-  'elite':     { badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300', bar: 'bg-emerald-500', header: 'dark:from-emerald-900/30 dark:via-teal-900/15',   label: 'Elite Framer',   icon: 'text-emerald-400' },
+  'elite':     { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300', bar: 'bg-blue-500', header: 'dark:from-blue-900/30 dark:via-teal-900/15',   label: 'Elite Framer',   icon: 'text-blue-400' },
   'above-avg': { badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',          bar: 'bg-blue-500',    header: 'dark:from-blue-900/30 dark:via-cyan-900/15',      label: 'Above Average',  icon: 'text-blue-400'    },
   'average':   { badge: 'bg-slate-500/10 border-slate-500/30 text-slate-400',       bar: 'bg-slate-500',   header: 'dark:from-slate-800/30 dark:via-slate-900/10',    label: 'Average',        icon: 'text-slate-400'   },
   'below-avg': { badge: 'bg-red-500/15 border-red-500/40 text-red-400',             bar: 'bg-red-500',     header: 'dark:from-red-900/30 dark:via-rose-900/15',       label: 'Below Average',  icon: 'text-red-400'     },
@@ -57,8 +57,8 @@ export function CatcherFramingCard({
   const cscd = Number(data.calledStrikeConversionDelta ?? 0);
   const hasCscd = data.calledStrikeConversionDelta !== undefined && Math.abs(cscd) > 0.001;
   const cscdBarPct = Math.min(100, Math.max(0, ((cscd + 0.05) / 0.10) * 100));
-  const cscdBarColor = cscd > 0 ? 'bg-emerald-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
-  const cscdColor = cscd > 0 ? 'text-emerald-400' : cscd < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]';
+  const cscdBarColor = cscd > 0 ? 'bg-blue-500' : cscd < 0 ? 'bg-red-500' : 'bg-slate-500';
+  const cscdColor = cscd > 0 ? 'text-blue-400' : cscd < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]';
 
   function fmtPct(v: number): string {
     return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
@@ -143,19 +143,19 @@ export function CatcherFramingCard({
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">K Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-emerald-400' : kImpact < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
+            <p className={cn('text-sm font-black tabular-nums', kImpact > 0 ? 'text-blue-400' : kImpact < 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {fmtPct(kImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">BB Prop</p>
-            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-emerald-400' : bbImpact > 0 ? 'text-amber-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
+            <p className={cn('text-sm font-black tabular-nums', bbImpact < 0 ? 'text-blue-400' : bbImpact > 0 ? 'text-amber-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {fmtPct(bbImpact)}
             </p>
           </div>
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-subtle)] p-2.5 text-center">
             <p className="text-[9px] uppercase tracking-widest text-[var(--text-faint)] mb-1">ERA Δ</p>
-            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-emerald-400' : eraImpact > 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
+            <p className={cn('text-sm font-black tabular-nums', eraImpact < 0 ? 'text-blue-400' : eraImpact > 0 ? 'text-red-400' : 'text-[var(--text-secondary,var(--text-muted))]')}>
               {eraImpact >= 0 ? '+' : ''}{eraImpact.toFixed(2)}
             </p>
           </div>

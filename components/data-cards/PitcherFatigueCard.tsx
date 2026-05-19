@@ -32,10 +32,10 @@ interface PitcherFatigueCardProps {
 const LABEL_STYLES = {
   fresh:    {
     bar: '#10b981',
-    badge: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300',
+    badge: 'bg-blue-500/15 border-blue-500/40 text-blue-300',
     badgeGlow: 'shadow-[0_0_12px_rgba(16,185,129,0.25)]',
-    header: 'from-emerald-600/25 dark:via-teal-900/10 to-transparent',
-    heroText: 'text-emerald-300',
+    header: 'from-blue-600/25 dark:via-teal-900/10 to-transparent',
+    heroText: 'text-blue-300',
     heroGlow: 'drop-shadow(0 0 8px rgba(16,185,129,0.5))',
     label: 'FRESH',
   },
@@ -97,13 +97,13 @@ export function PitcherFatigueCard({
   const recStyle =
     label === 'at-risk' ? 'bg-red-500/10 border-red-500/20 text-red-300'
     : label === 'tired'  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300';
+    : 'bg-blue-500/10 border-blue-500/20 text-blue-300';
 
   // Pitch count bar vs typical 100-pitch start
   const pitchCountPct = pitchCount > 0 ? Math.min(100, (pitchCount / 120) * 100) : 0;
 
   // Days rest chip
-  const restChipStyle = daysRest >= 5 ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300'
+  const restChipStyle = daysRest >= 5 ? 'bg-blue-500/15 border-blue-500/25 text-blue-300'
     : daysRest >= 4 ? 'bg-blue-500/15 border-blue-500/25 text-blue-300'
     : 'bg-red-500/15 border-red-500/25 text-red-300';
 

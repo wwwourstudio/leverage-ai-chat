@@ -15,7 +15,7 @@ export const ProjectionCard = memo(function ProjectionCard({ data, ...p }: Fanta
 
   const stats = [
     pts  != null && { label: 'Proj Pts', val: pts,  color: 'text-white' },
-    vbd  != null && { label: 'VBD',      val: `${vbdNum >= 0 ? '+' : ''}${vbdNum}`, color: vbdNum >= 0 ? 'text-emerald-400' : 'text-red-400' },
+    vbd  != null && { label: 'VBD',      val: `${vbdNum >= 0 ? '+' : ''}${vbdNum}`, color: vbdNum >= 0 ? 'text-blue-400' : 'text-red-400' },
     adp  != null && { label: 'ADP',      val: adp,  color: 'text-white' },
   ].filter(Boolean) as { label: string; val: string | number; color: string }[];
 

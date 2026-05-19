@@ -21,12 +21,12 @@ export const SportOverviewCard = memo(function SportOverviewCard({ data, ...p }:
           stats.length <= 3 ? 'grid-cols-3' : 'grid-cols-3',
         )}>
           {(stats as { label: string; val: string | number; color?: string }[]).map((s, i) => {
-            // Cycle through violet/purple/emerald for visual variety
+            // Cycle through violet/purple/blue for visual variety
             const accentCls = i % 3 === 0
               ? 'text-violet-300'
               : i % 3 === 1
               ? 'text-purple-300'
-              : 'text-emerald-300';
+              : 'text-blue-300';
             return (
               <div
                 key={i}

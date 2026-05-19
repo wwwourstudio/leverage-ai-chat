@@ -89,7 +89,7 @@ function parseRecentForm(recentForm?: string): boolean[] {
 }
 
 function rateChipClass(pct: number): string {
-  return pct >= 60 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+  return pct >= 60 ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
     : pct >= 40 ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
     : 'bg-red-500/15 text-red-400 border-red-500/20';
 }
@@ -127,7 +127,7 @@ function RecentFormSquares({ dots }: { dots: boolean[] }) {
             className={cn(
               'flex-1 h-6 rounded-md flex items-center justify-center text-[9px] font-black transition-all duration-300 animate-scale-in',
               hit
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
+                ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400'
                 : 'bg-red-500/15 border border-red-500/30 text-red-400',
             )}
             style={{ animationDelay: `${i * 50}ms` }}
@@ -184,7 +184,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
   const isWeak   = hitRatePercentage <= 35;
 
   const headerGrad = isStrong
-    ? 'from-emerald-500/8 to-transparent dark:from-emerald-600/25 dark:via-teal-900/10'
+    ? 'from-blue-500/8 to-transparent dark:from-blue-600/25 dark:via-teal-900/10'
     : isWeak
     ? 'from-red-500/8 to-transparent dark:from-red-600/25 dark:via-rose-900/10'
     : 'from-blue-500/8 to-transparent dark:from-blue-600/25 dark:via-indigo-900/10';
@@ -195,7 +195,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
     : trend === 'declining' ? TrendingDown
     : trend === 'insufficient_data' ? Activity : Minus;
 
-  const trendColor = trend === 'improving' ? 'text-emerald-400'
+  const trendColor = trend === 'improving' ? 'text-blue-400'
     : trend === 'declining' ? 'text-red-400'
     : 'text-[var(--foreground)]/40';
 
@@ -217,7 +217,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
         <div className="absolute top-3 right-3">
           <span className={cn(
             'text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border animate-badge-pop',
-            confidence === 'high'   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            confidence === 'high'   ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
             : confidence === 'medium' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
             : 'bg-red-500/15 border-red-500/30 text-red-300',
           )}>
@@ -256,7 +256,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
               <span className="text-[11px] font-black text-[var(--foreground)] tabular-nums">{avgLine.toFixed(1)}</span>
               <span className="text-[9px] text-[var(--foreground)]/40">·</span>
               <span className="text-[9px] text-[var(--foreground)]/40">Avg:</span>
-              <span className={cn('text-[11px] font-black tabular-nums', differential >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+              <span className={cn('text-[11px] font-black tabular-nums', differential >= 0 ? 'text-blue-400' : 'text-red-400')}>
                 {avgActual.toFixed(1)}
               </span>
             </div>
@@ -274,7 +274,7 @@ export const PropHitRateCard = memo(function PropHitRateCard({
             <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/40">Hit Rate</span>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black text-[var(--foreground)] tabular-nums">{hitRatePercentage.toFixed(0)}%</span>
-              {isStrong && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/25 text-emerald-400">OVER LEAN</span>}
+              {isStrong && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-blue-500/15 border border-blue-500/25 text-blue-400">OVER LEAN</span>}
               {isWeak   && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-red-500/15 border border-red-500/25 text-red-400">UNDER LEAN</span>}
             </div>
           </div>
@@ -297,18 +297,18 @@ export const PropHitRateCard = memo(function PropHitRateCard({
 
         {/* ── Over / Under + Edge grid ── */}
         <div className="grid grid-cols-3 gap-1.5">
-          <div className="flex flex-col items-center rounded-xl bg-emerald-500/8 border border-emerald-500/15 py-2.5 px-1">
-            <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400/50 mb-1">Over Hits</span>
-            <span className="text-sm font-black text-emerald-300 tabular-nums">{hits}</span>
+          <div className="flex flex-col items-center rounded-xl bg-blue-500/8 border border-blue-500/15 py-2.5 px-1">
+            <span className="text-[8px] font-black uppercase tracking-wider text-blue-400/50 mb-1">Over Hits</span>
+            <span className="text-sm font-black text-blue-300 tabular-nums">{hits}</span>
           </div>
           <div className="flex flex-col items-center rounded-xl bg-red-500/8 border border-red-500/15 py-2.5 px-1">
             <span className="text-[8px] font-black uppercase tracking-wider text-red-400/50 mb-1">Misses</span>
             <span className="text-sm font-black text-red-300 tabular-nums">{misses}</span>
           </div>
           <div className={cn('flex flex-col items-center rounded-xl border py-2.5 px-1',
-            differential >= 0 ? 'bg-emerald-500/8 border-emerald-500/15' : 'bg-red-500/8 border-red-500/15')}>
+            differential >= 0 ? 'bg-blue-500/8 border-blue-500/15' : 'bg-red-500/8 border-red-500/15')}>
             <span className="text-[8px] font-black uppercase tracking-wider mb-1" style={{ color: differential >= 0 ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)' }}>Edge</span>
-            <span className={cn('text-sm font-black tabular-nums', differential >= 0 ? 'text-emerald-300' : 'text-red-300')}>
+            <span className={cn('text-sm font-black tabular-nums', differential >= 0 ? 'text-blue-300' : 'text-red-300')}>
               {differential >= 0 ? '+' : ''}{differential.toFixed(1)}
             </span>
           </div>

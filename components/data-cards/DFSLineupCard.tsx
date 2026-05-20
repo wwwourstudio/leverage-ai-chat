@@ -119,136 +119,95 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
     <article className="group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_oklch(0.72_0.20_80/0.12)] transition-all duration-300">
 
       {/* ── Header ───────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 dark:via-amber-900/5 to-transparent border-b border-[var(--border-subtle)]">
-        <div className="absolute top-0 right-0 w-40 h-20 bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/5 rounded-bl-full blur-3xl pointer-events-none" />
-
-        {/* Breadcrumb + platform */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-white/60">
-            <span className="text-[9px] font-black uppercase tracking-widest">DFS</span>
-            <span className="text-white/30">·</span>
-            <span className="text-[9px]">Projected Lineup</span>
-          </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase tracking-wider">
-            {platformLabel}
-          </span>
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-transparent border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-1.5 text-white/60">
+          <span className="text-[9px] font-black uppercase tracking-widest">DFS</span>
+          <span className="text-white/30">·</span>
+          <span className="text-[9px]">Projected Lineup</span>
         </div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase tracking-wider">
+          {platformLabel}
+        </span>
+      </div>
 
-        <h3 className="font-black text-white leading-snug text-sm pr-4">{platformLabel} Projected Lineup</h3>
-
-        {/* Total hero */}
-        <div className="flex items-center gap-3 mt-2.5">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-white tabular-nums leading-none">{total.toFixed(1)}</span>
-            <span className="text-[10px] text-white/50 font-bold">proj pts</span>
+      {/* ── Title block ──────────────────────────────────────────────── */}
+      <div className="px-4 pt-3 pb-2.5 border-b border-[var(--border-subtle)]">
+        <h3 className="font-bebas text-[22px] text-white leading-none" style={{ letterSpacing: '0.02em' }}>{platformLabel} Projected Lineup</h3>
+        <div className="flex items-center gap-3 mt-1.5">
+          <div className="flex items-baseline gap-1">
+            <span className="font-bebas text-[28px] text-white tabular-nums leading-none" style={{ letterSpacing: '0.02em' }}>{total.toFixed(1)}</span>
+            <span className="font-dm-mono text-[10px] text-white/50">proj pts</span>
           </div>
           {totalP10 !== null && totalP90 !== null && (
-            <div className="flex items-center gap-1.5 text-[10px] tabular-nums">
-              <span className="text-red-400 font-bold">{totalP10.toFixed(0)}</span>
+            <div className="flex items-center gap-1 font-dm-mono text-[10px] tabular-nums">
+              <span className="text-red-400">{totalP10.toFixed(0)}</span>
               <span className="text-[var(--text-faint)]">–</span>
-              <span className="text-blue-400 font-bold">{totalP90.toFixed(0)}</span>
+              <span className="text-blue-400">{totalP90.toFixed(0)}</span>
               <span className="text-[var(--text-faint)]">range</span>
             </div>
-          )}
-          {lineup.length > 0 && (
-            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wide">
-              <span className="w-1 h-1 rounded-full bg-blue-400" />
-              {lineup.length} players
-            </span>
           )}
         </div>
       </div>
 
       {/* ── Roster rows ──────────────────────────────────────────────── */}
       <div className="divide-y divide-[var(--border-subtle)]/40">
-        {lineup.map((p, i) => {
-          const barPct    = Math.min(100, ((p.dk_pts_mean ?? 0) / maxPts) * 100);
-          const hasRange  = p.p10 != null && p.p90 != null;
-          const hasMatchup = p.matchup_score != null;
-
-          return (
-            <div
-              key={i}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-2.5 hover:bg-[var(--bg-elevated)]/50 transition-colors',
-                i % 2 === 0 ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-elevated)]/30',
-              )}
-            >
-              {/* Position */}
-              <PositionBubble position={p.player_type} />
-
-              {/* Name + range or bar */}
-              <div className="flex-1 min-w-0 space-y-0.5">
-                <span className="font-black text-white text-[12px] truncate block">{p.player_name}</span>
-                {hasRange ? (
-                  <RangeTrack p10={p.p10!} p50={p.p50 ?? p.dk_pts_mean} p90={p.p90!} mean={p.dk_pts_mean} />
-                ) : (
-                  <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden max-w-[100px] mt-1">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))] to-amber-400 transition-all duration-500" style={{ width: `${barPct}%` }} />
-                  </div>
-                )}
-              </div>
-
-              {/* Matchup chip */}
-              {hasMatchup && <MatchupDot score={p.matchup_score!} />}
-
-              {/* Salary */}
-              {p.salary != null && (
-                <span className="text-[10px] font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 tabular-nums shrink-0">
-                  {String(p.salary).startsWith('$') ? String(p.salary) : `$${p.salary}`}
-                </span>
-              )}
-
-              {/* Projected pts */}
-              <div className="flex flex-col items-end shrink-0">
-                <span className="text-[14px] font-black text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-none">
-                  {(p.dk_pts_mean ?? 0).toFixed(1)}
-                </span>
-                <span className="text-[8px] text-[var(--text-faint)]">pts</span>
-              </div>
-            </div>
-          );
-        })}
+        {lineup.map((p, i) => (
+          <div
+            key={i}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 transition-colors',
+              i % 2 === 0 ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-elevated)]/30',
+            )}
+          >
+            {/* POS */}
+            <span className="font-dm-mono text-[10px] text-[var(--text-muted)] min-w-[24px] shrink-0 uppercase">{p.player_type}</span>
+            {/* Name */}
+            <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--foreground)] truncate">{p.player_name}</span>
+            {/* Team */}
+            <span className="font-dm-mono text-[10px] text-[var(--text-secondary,var(--text-muted))] shrink-0">—</span>
+            {/* Salary */}
+            {p.salary != null && (
+              <span className="font-dm-mono text-[11px] text-[var(--text-secondary,var(--text-muted))] tabular-nums shrink-0">
+                {String(p.salary).startsWith('$') ? String(p.salary) : `$${p.salary}`}
+              </span>
+            )}
+            {/* Proj pts */}
+            <span className="font-dm-mono text-[11px] font-medium text-green-400 tabular-nums shrink-0 min-w-[3ch] text-right">
+              {(p.dk_pts_mean ?? 0).toFixed(1)}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       {lineup.length > 0 && (
-        <div className="px-3 pt-3 pb-3 space-y-2.5 border-t border-[var(--border-subtle)]">
-          {/* Total row */}
-          <div className="flex items-center justify-between px-1">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">Total Projected</span>
-              {hasSalary && totalSalaryNum > 0 && (
-                <span className="text-[9px] font-bold text-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 tabular-nums">
-                  ${(totalSalaryNum / 1000).toFixed(1)}K salary
-                </span>
-              )}
+        <div className="border-t border-[var(--border-subtle)] px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <span className="font-bebas text-[18px] text-white tabular-nums leading-tight" style={{ letterSpacing: '0.02em' }}>{total.toFixed(1)}</span>
+              <span className="font-dm-mono text-[9px] uppercase text-[var(--text-muted)]">Proj Pts</span>
             </div>
-            <div className="flex items-baseline gap-2">
-              {totalP10 !== null && (
-                <span className="text-[10px] text-red-400 tabular-nums font-bold">Floor {totalP10.toFixed(1)}</span>
-              )}
-              <span className="text-xl font-black text-white tabular-nums">{total.toFixed(1)}</span>
-              {totalP90 !== null && (
-                <span className="text-[10px] text-blue-400 tabular-nums font-bold">Ceil {totalP90.toFixed(1)}</span>
-              )}
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase">
-                PTS
-              </span>
-            </div>
+            {hasSalary && totalSalaryNum > 0 && (
+              <>
+                <div className="w-px h-8 bg-[var(--border-subtle)]" />
+                <div className="flex flex-col">
+                  <span className="font-bebas text-[18px] text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-tight" style={{ letterSpacing: '0.02em' }}>${(totalSalaryNum / 1000).toFixed(1)}K</span>
+                  <span className="font-dm-mono text-[9px] uppercase text-[var(--text-muted)]">Salary</span>
+                </div>
+                <div className="w-px h-8 bg-[var(--border-subtle)]" />
+                <div className="flex flex-col">
+                  <span className="font-bebas text-[18px] text-green-400 tabular-nums leading-tight" style={{ letterSpacing: '0.02em' }}>${((50000 - totalSalaryNum) / 1000).toFixed(1)}K</span>
+                  <span className="font-dm-mono text-[9px] uppercase text-[var(--text-muted)]">Left</span>
+                </div>
+              </>
+            )}
           </div>
-
-          {/* CTA */}
           {onAsk && (
             <button
-              onClick={() =>
-                onAsk(`Evaluate this ${platformLabel} DFS lineup: ${lineup.map(p => p.player_name).join(', ')} — any swaps to improve ceiling or floor?`)
-              }
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-[var(--cat-dfs,oklch(0.72_0.20_80))]/80 to-amber-500/80 text-black text-[11px] font-black uppercase tracking-wide hover:from-[var(--cat-dfs,oklch(0.72_0.20_80))] hover:to-amber-400 shadow-[0_2px_10px_oklch(0.72_0.20_80/0.35)] hover:shadow-[0_4px_16px_oklch(0.72_0.20_80/0.5)] transition-all duration-200"
+              onClick={() => onAsk(`Evaluate this ${platformLabel} DFS lineup: ${lineup.map(p => p.player_name).join(', ')} — any swaps to improve ceiling or floor?`)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 font-dm-mono text-[10px] text-blue-300 hover:bg-blue-500/25 transition-colors"
             >
-              <Zap className="w-3.5 h-3.5" />
-              Optimize Lineup
-              <ChevronRight className="w-3.5 h-3.5" />
+              Export
             </button>
           )}
         </div>

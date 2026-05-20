@@ -417,7 +417,8 @@ class CircuitBreaker {
         this.state = 'half-open';
         console.log('[KALSHI] Circuit breaker → half-open (probe)');
       } else {
-        throw new Error('[KALSHI] Circuit breaker is OPEN — skipping fetch');
+        const msSinceFail = Date.now() - this.lastFailTime;
+        throw new Error(`[KALSHI] Circuit breaker OPEN (${Math.round(msSinceFail / 1000)}s since last failure — will retry in ${Math.round((this.resetTimeoutMs - msSinceFail) / 1000)}s)`);
       }
     }
 
@@ -432,11 +433,16 @@ class CircuitBreaker {
   }
 
   forceReset(): void {
+    const wasOpen = this.state !== 'closed';
     this.failures     = 0;
     this.state        = 'closed';
     this.lastFailTime = 0;
     this.openedAt     = 0;
-    console.log('[KALSHI] Circuit breaker force-reset → closed');
+    // Only log when there was an actual state change — avoids noisy "force-reset"
+    // messages on every cron tick when the breaker was already closed.
+    if (wasOpen) {
+      console.log('[KALSHI] Circuit breaker force-reset → closed');
+    }
   }
 
   private _onSuccess(): void {
@@ -450,10 +456,15 @@ class CircuitBreaker {
   private _onFailure(): void {
     this.failures++;
     this.lastFailTime = Date.now();
-    if (this.failures >= this.threshold && this.state === 'closed') {
+    if (this.state === 'half-open') {
+      // Probe failed — go back to open so the next reset attempt is explicit
       this.state    = 'open';
       this.openedAt = Date.now();
-      console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} failures`);
+      console.warn(`[KALSHI] Circuit breaker probe FAILED → re-opened (failures=${this.failures})`);
+    } else if (this.failures >= this.threshold && this.state === 'closed') {
+      this.state    = 'open';
+      this.openedAt = Date.now();
+      console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} consecutive failures`);
     }
   }
 

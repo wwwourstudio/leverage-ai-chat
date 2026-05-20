@@ -86,9 +86,10 @@ export async function POST(request: NextRequest) {
   let rateLimitUserId: string | undefined;
   try {
     const supabase = await createClient();
-    // getSession() reads the cookie locally — no Supabase server round-trip needed for rate limiting
-    const { data: { session } } = await supabase.auth.getSession();
-    rateLimitUserId = session?.user?.id;
+    // getUser() performs a server-side token verification — required by Supabase to
+    // avoid the "Using the user object from getSession()" security warning on the server.
+    const { data: { user } } = await supabase.auth.getUser();
+    rateLimitUserId = user?.id;
   } catch {
     // Supabase unavailable — fall through to IP-based limiting
   }

@@ -2719,10 +2719,38 @@ async function _generateContextualCards(
               baseball_mlb:          { posLabel: 'SP',  projMult: 2.9,   sport: 'MLB', stackTip: '4-5 man batting order stacks' },
             };
             const cfg = dfsCfg[normalizedSport] ?? { posLabel: 'FLEX', projMult: 0.20, sport: displaySport ?? 'DFS', stackTip: 'top scorers' };
+
+            // MLB: resolve probable starters from the cached schedule (same Redis key as prompt-enrichment)
+            // so we show real pitcher names instead of "MLB Slate Leader" placeholder labels.
+            const _pitcherByTeam = new Map<string, string>(); // team last-word → pitcher full name
+            if (normalizedSport === 'baseball_mlb') {
+              try {
+                const { cacheGet: _cGet, bucket: _bkt } = await import('@/lib/cache/redis-cache');
+                const _schedKey = `mlb:schedule:v1:${new Date().toISOString().slice(0, 10)}:${_bkt(300_000)}`;
+                let _sched: any[] | null = await _cGet<any[]>(_schedKey).catch(() => null);
+                if (!_sched?.length) {
+                  const { fetchTodaysGames: _ftg } = await import('@/lib/mlb-projections/mlb-stats-api');
+                  _sched = await Promise.race([
+                    _ftg(),
+                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+                  ]).catch(() => null);
+                }
+                for (const g of (_sched ?? [])) {
+                  const homeWord = (g.homeTeam ?? g.home ?? '').split(' ').pop() ?? '';
+                  const awayWord = (g.awayTeam ?? g.away ?? '').split(' ').pop() ?? '';
+                  if (homeWord && g.probableHomePitcher?.fullName) _pitcherByTeam.set(homeWord, g.probableHomePitcher.fullName);
+                  if (awayWord && g.probableAwayPitcher?.fullName) _pitcherByTeam.set(awayWord, g.probableAwayPitcher.fullName);
+                }
+              } catch { /* non-critical */ }
+            }
+
             const top = dfsGames[0];
             const topProj = Math.round(top.total * cfg.projMult);
             const topSalary = Math.round((topProj * 190 + 3800) / 100) * 100;
             const topTeam = top.homeWinProb >= 0.5 ? top.homeTeam : top.awayTeam;
+            const _topWord = topTeam.split(' ').pop() ?? topTeam;
+            const _topPlayer = _pitcherByTeam.get(_topWord)
+              ?? (normalizedSport === 'baseball_mlb' ? `${_topWord} SP (TBD)` : `${_topWord} Stack`);
             cards.push({
               type: CARD_TYPES.DFS_MATCHUP,
               title: `${top.awayTeam.split(' ').pop()} @ ${top.homeTeam.split(' ').pop()} — Top Stack`,
@@ -2733,8 +2761,8 @@ async function _generateContextualCards(
               status: 'optimal',
               realData: true,
               data: {
-                player: `${cfg.sport} Slate Leader`,
-                team: topTeam.split(' ').pop() ?? topTeam,
+                player: _topPlayer,
+                team: _topWord,
                 position: cfg.posLabel,
                 salary: `$${topSalary.toLocaleString()}`,
                 projection: topProj.toFixed(1),
@@ -2754,6 +2782,10 @@ async function _generateContextualCards(
               const val = dfsGames[1];
               const valProj = Math.round(val.total * cfg.projMult * 0.9);
               const valSalary = Math.round((valProj * 190 + 3800) / 100) * 100;
+              const _valTeam = val.homeWinProb >= 0.5 ? val.homeTeam : val.awayTeam;
+              const _valWord = _valTeam.split(' ').pop() ?? _valTeam;
+              const _valPlayer = _pitcherByTeam.get(_valWord)
+                ?? (normalizedSport === 'baseball_mlb' ? `${_valWord} SP (TBD)` : `${_valWord} Stack`);
               cards.push({
                 type: CARD_TYPES.DFS_VALUE,
                 title: `${val.awayTeam.split(' ').pop()} @ ${val.homeTeam.split(' ').pop()} — Value`,
@@ -2764,8 +2796,8 @@ async function _generateContextualCards(
                 status: 'value',
                 realData: true,
                 data: {
-                  player: `${cfg.sport} Value Play`,
-                  team: (val.homeWinProb >= 0.5 ? val.homeTeam : val.awayTeam).split(' ').pop() ?? '',
+                  player: _valPlayer,
+                  team: _valWord,
                   position: cfg.posLabel,
                   salary: `$${valSalary.toLocaleString()}`,
                   projection: valProj.toFixed(1),
@@ -2785,6 +2817,10 @@ async function _generateContextualCards(
               const con = dfsGames[dfsGames.length - 1];
               const conProj = Math.round(con.total * cfg.projMult * 0.75);
               const conSalary = Math.round((conProj * 190 + 3800) / 100) * 100;
+              const _conTeam = con.homeWinProb < 0.5 ? con.awayTeam : con.homeTeam;
+              const _conWord = _conTeam.split(' ').pop() ?? _conTeam;
+              const _conPlayer = _pitcherByTeam.get(_conWord)
+                ?? (normalizedSport === 'baseball_mlb' ? `${_conWord} SP (TBD)` : `${_conWord} Stack`);
               cards.push({
                 type: CARD_TYPES.DFS_LINEUP,
                 title: `${con.awayTeam.split(' ').pop()} @ ${con.homeTeam.split(' ').pop()} — Contrarian`,
@@ -2795,8 +2831,8 @@ async function _generateContextualCards(
                 status: 'value',
                 realData: true,
                 data: {
-                  player: `${cfg.sport} Contrarian`,
-                  team: (con.homeWinProb < 0.5 ? con.awayTeam : con.homeTeam).split(' ').pop() ?? '',
+                  player: _conPlayer,
+                  team: _conWord,
                   position: cfg.posLabel,
                   salary: `$${conSalary.toLocaleString()}`,
                   projection: conProj.toFixed(1),

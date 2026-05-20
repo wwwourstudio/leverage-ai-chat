@@ -1,17 +1,32 @@
 /**
  * Prompt enrichment for the /api/analyze pipeline.
  *
- * Builds the final enrichedPrompt string by progressively injecting live data
- * blocks (odds, Kalshi markets, Statcast leaders, NFL context, etc.) into the
- * base user message. Also sets context.oddsData as a side effect when odds
- * are server-fetched (downstream card generation reads it).
+ * Builds the final enrichedPrompt string by injecting live data blocks (odds,
+ * Kalshi markets, Statcast leaders, NFL context, etc.) into the base user
+ * message. Also sets context.oddsData as a side effect when odds are fetched
+ * server-side (downstream card generation reads it).
+ *
+ * Independent data sources (Statcast leaders, MLB schedule) are kicked off as
+ * parallel Promises at function entry so they are ready by the time the odds
+ * branch resolves, keeping end-to-end latency close to the slowest single fetch
+ * rather than their sum.
+ *
+ * Timeout budget per service (cold cache):
+ *   Odds API          2.5 s  (was 8 s)
+ *   Kalshi main       2.5 s  (was 6 s)
+ *   Kalshi sports     2.0 s  (was 4 s)
+ *   Statcast DB       1.0 s  (was 0.8 s — now parallel)
+ *   Statcast Savant   2.0 s  (was 4 s   — now parallel)
+ *   MLB schedule      2.0 s  (was 3 s   — now parallel)
  */
 
 import { getOddsApiKey } from '@/lib/config';
 import { getMarketIntelligenceSummary } from '@/lib/market-intelligence';
-import { LOG_PREFIXES, NFL_SEASON_YEAR } from '@/lib/constants';
+import { NFL_SEASON_YEAR } from '@/lib/constants';
 import { cacheGet, cacheSet, bucket } from '@/lib/cache/redis-cache';
 import type { AnalyzeContext, SportDetectionResult, EnrichmentResult } from './types';
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
 
 /** Format an American-odds number, returning 'N/A' for invalid values. */
 function fmtOdds(p: unknown): string {
@@ -52,6 +67,121 @@ function formatOddsEvents(events: any[], sportLabel: string): string {
   return `\n\n--- REAL LIVE ODDS DATA (use ONLY these numbers for odds/lines) ---\nSport: ${sportLabel}\n\n${oddsPreview}\n--- END ODDS DATA ---`;
 }
 
+// ── Private parallel-fetch helpers ────────────────────────────────────────────
+
+/**
+ * Fetch and cache Statcast leaders. Tries the DB first (1 s timeout), falls
+ * back to Baseball Savant (2 s timeout). Returns a formatted text block ready
+ * for prompt injection, or null if neither source had enough data.
+ *
+ * Shape detection handles both DB (snake_case) and Savant (camelCase) records
+ * transparently, including cached results from either source.
+ */
+async function _fetchStatcastBlock(season: number): Promise<{ block: string; injected: boolean } | null> {
+  const key = `statcast:leaders:v1:${season}:${bucket(3_600_000)}`;
+  try {
+    // ── Cache hit ─────────────────────────────────────────────────────────────
+    let batters: any[] | undefined;
+    let pitchers: any[] | undefined;
+
+    const cached = await cacheGet<{ batters: any[]; pitchers: any[] }>(key).catch(() => null);
+    if (cached && (cached.batters?.length ?? 0) >= 3) {
+      console.log(`[v0] [ANALYZE] Statcast leaders cache hit (${cached.batters.length} batters)`);
+      batters  = cached.batters;
+      pitchers = cached.pitchers ?? [];
+    }
+
+    // ── DB fetch ──────────────────────────────────────────────────────────────
+    if (!batters) {
+      const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
+      const fromDB = await Promise.race([
+        getTopStatcastLeadersFromDB(season, 5),
+        new Promise<{ batters: never[]; pitchers: never[] }>(
+          resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 1000)
+        ),
+      ]);
+      if ((fromDB?.batters?.length ?? 0) >= 3) {
+        batters  = fromDB.batters;
+        pitchers = fromDB.pitchers ?? [];
+        void cacheSet(key, fromDB, 3600);
+      }
+    }
+
+    // ── Baseball Savant fallback ───────────────────────────────────────────────
+    if (!batters) {
+      const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
+      const { players } = await Promise.race([
+        getStatcastData(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+      ]);
+      if (players.length > 0) {
+        batters  = queryStatcast(players, { playerType: 'batter',  limit: 5 }).sort((a, b) => b.barrelRate - a.barrelRate);
+        pitchers = queryStatcast(players, { playerType: 'pitcher', limit: 5 }).sort((a, b) => a.xslg - b.xslg);
+        if ((batters?.length ?? 0) >= 3) {
+          void cacheSet(key, { batters, pitchers }, 3600);
+          void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
+            persistStatcastLeaders(players)
+          ).catch((e: unknown) => {
+            console.warn('[v0] [ANALYZE] statcast DB warm failed:', e instanceof Error ? e.message : e);
+          });
+        }
+      }
+    }
+
+    if (!batters || batters.length < 3 || !pitchers || pitchers.length < 3) return null;
+
+    // Format — detect shape by field name (DB = snake_case, Savant = camelCase)
+    const fmtB = (p: any) => 'player_name' in p
+      ? `  ${p.player_name}: Barrel% ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA ${Number(p.xwoba ?? 0).toFixed(3)}, HardHit% ${Number(p.hard_hit_pct ?? 0).toFixed(1)}, ExitVelo ${Number(p.avg_exit_velocity ?? 0).toFixed(1)} mph`
+      : `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
+    const fmtP = (p: any) => 'player_name' in p
+      ? `  ${p.player_name}: xSLG-allowed ${Number(p.xslg ?? 0).toFixed(3)}, Barrel%-allowed ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA-against ${Number(p.xwoba ?? 0).toFixed(3)}`
+      : `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
+
+    const block = `\n\n${[
+      `--- MLB STATCAST LEADERS (${season} season) ---`,
+      'Top Batters by Barrel Rate:',
+      ...batters.map(fmtB),
+      'Top Pitchers (lowest xSLG allowed):',
+      ...pitchers.map(fmtP),
+      '--- END STATCAST ---',
+    ].join('\n')}`;
+
+    console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
+    return { block, injected: true };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch and cache today's MLB schedule. 2 s timeout.
+ * Returns the game array, or null on miss/error.
+ */
+async function _fetchMLBSchedule(): Promise<any[] | null> {
+  const key = `mlb:schedule:v1:${new Date().toISOString().slice(0, 10)}:${bucket(300_000)}`;
+  try {
+    const cached = await cacheGet<any[]>(key).catch(() => null);
+    if (cached !== null) {
+      console.log(`[v0] [ANALYZE] MLB schedule cache hit (${cached.length} games)`);
+      return cached;
+    }
+    const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
+    const games = await Promise.race([
+      fetchTodaysGames(),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+    ]).catch(() => null);
+    if (Array.isArray(games) && games.length > 0) {
+      void cacheSet(key, games, 300);
+    }
+    return Array.isArray(games) ? games : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
 /**
  * Build the enriched prompt by injecting live data context blocks.
  *
@@ -69,10 +199,7 @@ export async function buildEnrichedPrompt(
   detection: SportDetectionResult,
   dateStr: string,
 ): Promise<EnrichmentResult> {
-  const {
-    isMLBQuery,
-    hasADPIntent,
-  } = detection;
+  const { isMLBQuery, hasADPIntent } = detection;
 
   let enrichedPrompt = userMessage;
   let kalshiSportsFallbackMarkets: any[] | null = null;
@@ -80,6 +207,19 @@ export async function buildEnrichedPrompt(
   let serverFetchedOdds = false;
   let statcastInjected = false;
   let noLiveGamesDetected = false;
+
+  const STATCAST_SEASON = new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
+
+  // ── Pre-fetch MLB data in parallel (concurrent with branch selection) ─────
+  // These are fully independent of the odds result; starting them here saves
+  // up to 3 s of serial waiting on the Branch 5 hot path.
+  const _statcastPromise = (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket)
+    ? _fetchStatcastBlock(STATCAST_SEASON)
+    : Promise.resolve(null);
+
+  const _schedulePromise = (isMLBQuery && !context.isPoliticalMarket)
+    ? _fetchMLBSchedule()
+    : Promise.resolve(null);
 
   // ── Branch 1: Client already has live odds ────────────────────────────────
   if (context.oddsData?.events?.length > 0 && !context.isPoliticalMarket) {
@@ -89,11 +229,11 @@ export async function buildEnrichedPrompt(
   } else if (context.noGamesAvailable) {
     enrichedPrompt += `\n\n[Context: No live ${context.sport?.toUpperCase() || 'sports'} games are currently scheduled (offseason or between games). Provide expert analysis, offseason insights, betting strategy, and relevant market knowledge instead of live odds.]`;
 
-  // ── Branch 3: Non-betting sports question ────────────────────────────────
+  // ── Branch 3: Non-betting sports question ─────────────────────────────────
   } else if (!context.hasBettingIntent && context.sport) {
     enrichedPrompt += `\n\n[Context: User is asking about ${context.sport.toUpperCase()} — provide expert analysis using your knowledge. No live odds needed for this question.]`;
 
-  // ── Branch 4: Kalshi / prediction market query ───────────────────────────
+  // ── Branch 4: Kalshi / prediction market query ────────────────────────────
   } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi') {
     try {
       const sub = (context.kalshiSubcategory || '').toLowerCase();
@@ -117,7 +257,7 @@ export async function buildEnrichedPrompt(
 
         markets = await Promise.race([
           fetchMarkets,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)), // was 6000
         ]).catch(() => null);
 
         if (Array.isArray(markets)) {
@@ -170,7 +310,7 @@ export async function buildEnrichedPrompt(
         if (_serverEvents === null) {
           _serverEvents = await Promise.race([
             fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)), // was 8000
           ]).catch(() => null);
           // Cache the result (including empty arrays — no live games IS a valid cached state)
           if (Array.isArray(_serverEvents)) {
@@ -239,7 +379,7 @@ export async function buildEnrichedPrompt(
           const { fetchKalshiMarketsWithRetry } = await import('@/lib/kalshi/index');
           markets = await Promise.race([
             fetchKalshiMarketsWithRetry({ search: sportKw, limit: 10, maxRetries: 3 }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)), // was 4000
           ]).catch(() => null);
           if (Array.isArray(markets)) {
             void cacheSet(_kalshiSportKey, markets, 180);
@@ -280,85 +420,18 @@ export async function buildEnrichedPrompt(
     enrichedPrompt += `\n\n[Context: General question — answer with your full expert knowledge about sports betting, fantasy, DFS, or prediction markets as appropriate.]`;
   }
 
-  // ── Statcast enrichment for MLB queries ───────────────────────────────────
-  // Inject top barrel rate / exit velocity leaders from DB (warm) or Baseball Savant (cold).
+  // ── Statcast enrichment (awaits pre-fetched parallel result) ─────────────
+  // By this point the promise has been running concurrently with the odds
+  // branch above, so the await here adds little or no extra latency.
   if (isMLBQuery && !hasADPIntent && !context.isPoliticalMarket) {
-    const STATCAST_SEASON = new Date().getFullYear() - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
-    try {
-      // Statcast leaders change daily — cache for 1 hour
-      const _statcastKey = `statcast:leaders:v1:${STATCAST_SEASON}:${bucket(3_600_000)}`;
-      let _statcastLeaders = await cacheGet<{ batters: any[]; pitchers: any[] }>(_statcastKey).catch(() => null);
-
-      if (_statcastLeaders === null) {
-        const { getTopStatcastLeadersFromDB } = await import('@/lib/services/statcast-ingest');
-        _statcastLeaders = await Promise.race([
-          getTopStatcastLeadersFromDB(STATCAST_SEASON, 5),
-          new Promise<{ batters: never[]; pitchers: never[] }>(
-            resolve => setTimeout(() => resolve({ batters: [], pitchers: [] }), 800)
-          ),
-        ]);
-        if ((_statcastLeaders?.batters?.length ?? 0) >= 3) {
-          void cacheSet(_statcastKey, _statcastLeaders, 3600);
-        }
-      } else {
-        console.log(`[v0] [ANALYZE] Statcast leaders cache hit (${_statcastLeaders.batters?.length ?? 0} batters)`);
-      }
-
-      const { batters: dbBatters, pitchers: dbPitchers } = _statcastLeaders ?? { batters: [], pitchers: [] };
-
-      if (dbBatters.length >= 3 && dbPitchers.length >= 3) {
-        const fmtB = (p: Record<string, unknown>) =>
-          `  ${p.player_name}: Barrel% ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA ${Number(p.xwoba ?? 0).toFixed(3)}, HardHit% ${Number(p.hard_hit_pct ?? 0).toFixed(1)}, ExitVelo ${Number(p.avg_exit_velocity ?? 0).toFixed(1)} mph`;
-        const fmtP = (p: Record<string, unknown>) =>
-          `  ${p.player_name}: xSLG-allowed ${Number(p.xslg ?? 0).toFixed(3)}, Barrel%-allowed ${Number(p.barrel_rate ?? 0).toFixed(1)}, xwOBA-against ${Number(p.xwoba ?? 0).toFixed(3)}`;
-        enrichedPrompt += `\n\n${[
-          `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
-          'Top Batters by Barrel Rate:',
-          ...dbBatters.map(fmtB),
-          'Top Pitchers (lowest xSLG allowed):',
-          ...dbPitchers.map(fmtP),
-          '--- END STATCAST ---',
-        ].join('\n')}`;
-        statcastInjected = true;
-        console.log(`[v0] [ANALYZE] Injected Statcast leaders from DB: ${dbBatters.length} batters, ${dbPitchers.length} pitchers`);
-      } else {
-        const { getStatcastData, queryStatcast } = await import('@/lib/baseball-savant');
-        const { players: statcastPlayers } = await Promise.race([
-          getStatcastData(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
-        ]);
-        if (statcastPlayers.length > 0) {
-          const batters = queryStatcast(statcastPlayers, { playerType: 'batter', limit: 5 })
-            .sort((a, b) => b.barrelRate - a.barrelRate);
-          const pitchers = queryStatcast(statcastPlayers, { playerType: 'pitcher', limit: 5 })
-            .sort((a, b) => a.xslg - b.xslg);
-          const fmtB = (p: (typeof batters)[0]) =>
-            `  ${p.name}: Barrel% ${p.barrelRate.toFixed(1)}, xwOBA ${p.xwoba.toFixed(3)}, HardHit% ${p.hardHitPct.toFixed(1)}, ExitVelo ${p.exitVelocity.toFixed(1)} mph`;
-          const fmtP = (p: (typeof pitchers)[0]) =>
-            `  ${p.name}: xSLG-allowed ${p.xslg.toFixed(3)}, Barrel%-allowed ${p.barrelRate.toFixed(1)}, xwOBA-against ${p.xwoba.toFixed(3)}`;
-          enrichedPrompt += `\n\n${[
-            `--- MLB STATCAST LEADERS (${STATCAST_SEASON} season) ---`,
-            'Top Batters by Barrel Rate:',
-            ...batters.map(fmtB),
-            'Top Pitchers (lowest xSLG allowed):',
-            ...pitchers.map(fmtP),
-            '--- END STATCAST ---',
-          ].join('\n')}`;
-          statcastInjected = true;
-          console.log(`[v0] [ANALYZE] Injected Statcast leaders: ${batters.length} batters, ${pitchers.length} pitchers`);
-          void import('@/lib/services/statcast-ingest').then(({ persistStatcastLeaders }) =>
-            persistStatcastLeaders(statcastPlayers)
-          ).catch((e: unknown) => {
-            console.warn('[v0] [ANALYZE] statcast DB warm failed (non-critical):', e instanceof Error ? e.message : e);
-          });
-        }
-      }
-    } catch {
-      // Non-critical — skip if DB and Baseball Savant are both unreachable
+    const statcastResult = await _statcastPromise;
+    if (statcastResult?.injected) {
+      enrichedPrompt += statcastResult.block;
+      statcastInjected = true;
     }
   }
 
-  // ── Market Intelligence signal injection (non-blocking, 2s timeout) ────────
+  // ── Market Intelligence signal injection (non-blocking, 2 s timeout) ──────
   if (context.sport && context.oddsData?.events?.length > 0) {
     try {
       const primaryEvent = context.oddsData.events[0];
@@ -377,43 +450,24 @@ export async function buildEnrichedPrompt(
     }
   }
 
-  // ── MLB schedule injection — prevents recommending inactive pitchers ────────
+  // ── MLB schedule injection (awaits pre-fetched parallel result) ───────────
   if (isMLBQuery && !context.isPoliticalMarket) {
-    try {
-      const _mlbSchedKey = `mlb:schedule:v1:${new Date().toISOString().slice(0, 10)}:${bucket(300_000)}`; // 5-min buckets
-      let todaysGames = await cacheGet<Awaited<ReturnType<any>>>(_mlbSchedKey).catch(() => null);
-
-      if (todaysGames === null) {
-        const { fetchTodaysGames } = await import('@/lib/mlb-projections/mlb-stats-api');
-        todaysGames = await Promise.race([
-          fetchTodaysGames(),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-        ]).catch(() => []);
-        if (Array.isArray(todaysGames) && todaysGames.length > 0) {
-          void cacheSet(_mlbSchedKey, todaysGames, 300);
-        }
-      } else {
-        console.log(`[v0] [ANALYZE] MLB schedule cache hit (${todaysGames.length} games)`);
-      }
-
-      if (todaysGames.length > 0) {
-        const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-        const scheduleLines = todaysGames.map((g: any) =>
-          `${g.awayTeam ?? g.away ?? 'Away'} @ ${g.homeTeam ?? g.home ?? 'Home'}` +
-          ` | Away SP: ${g.probableAwayPitcher?.fullName ?? 'TBD'}` +
-          ` | Home SP: ${g.probableHomePitcher?.fullName ?? 'TBD'}`
-        );
-        enrichedPrompt +=
-          `\n\n--- TODAY'S MLB SCHEDULE (${todayLabel}) ---\n` +
-          scheduleLines.join('\n') +
-          `\n--- END SCHEDULE ---\n` +
-          `CRITICAL: Only recommend pitchers who appear in TODAY'S SCHEDULE above. ` +
-          `If a pitcher is NOT listed, explicitly state they are not scheduled to pitch today and decline to give a start/sit recommendation for them.\n`;
-      } else {
-        enrichedPrompt += `\n\n[MLB Schedule: No games found for today or schedule unavailable. Do not make start/sit pitcher recommendations without verified schedule data.]\n`;
-      }
-    } catch {
-      // Non-blocking — skip if schedule API is unavailable
+    const todaysGames = await _schedulePromise;
+    if (todaysGames && todaysGames.length > 0) {
+      const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      const scheduleLines = todaysGames.map((g: any) =>
+        `${g.awayTeam ?? g.away ?? 'Away'} @ ${g.homeTeam ?? g.home ?? 'Home'}` +
+        ` | Away SP: ${g.probableAwayPitcher?.fullName ?? 'TBD'}` +
+        ` | Home SP: ${g.probableHomePitcher?.fullName ?? 'TBD'}`
+      );
+      enrichedPrompt +=
+        `\n\n--- TODAY'S MLB SCHEDULE (${todayLabel}) ---\n` +
+        scheduleLines.join('\n') +
+        `\n--- END SCHEDULE ---\n` +
+        `CRITICAL: Only recommend pitchers who appear in TODAY'S SCHEDULE above. ` +
+        `If a pitcher is NOT listed, explicitly state they are not scheduled to pitch today and decline to give a start/sit recommendation for them.\n`;
+    } else {
+      enrichedPrompt += `\n\n[MLB Schedule: No games found for today or schedule unavailable. Do not make start/sit pitcher recommendations without verified schedule data.]\n`;
     }
   }
 

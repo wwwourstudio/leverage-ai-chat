@@ -72,6 +72,8 @@ export async function fetchDynamicCards(params: {
     return inflightRequests.get(cacheKey)!;
   }
 
+  console.log('[Cards] fetchDynamicCards called:', cacheKey);
+
   const fetchPromise = (async (): Promise<DynamicCard[]> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
@@ -99,6 +101,8 @@ export async function fetchDynamicCards(params: {
 
       if (cards.length === 0) {
         console.warn(`${LOG_PREFIXES.DATA_SERVICE} Zero cards returned`, { params });
+        // Don't cache empty results — allow the next call to retry immediately
+        return cards;
       }
 
       cache.set(cacheKey, cards);

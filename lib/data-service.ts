@@ -28,6 +28,7 @@ export interface UserInsights {
 const CARDS_TTL = CACHE_CONFIG.CARDS_TTL;
 
 const cache = new TtlCache<any>(100);
+const inflightRequests = new Map<string, Promise<DynamicCard[]>>();
 
 async function safeJsonParse(response: Response): Promise<any> {
   const text = await response.text();
@@ -66,41 +67,52 @@ export async function fetchDynamicCards(params: {
   const cached = cache.get(cacheKey, CARDS_TTL);
   if (cached !== undefined) return cached;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
-
-  try {
-    const response = await fetch(API_ENDPOINTS.CARDS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Cards API ${response.status}: ${errText.substring(0, 100)}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      throw new Error('Cards API returned non-JSON response');
-    }
-
-    const result = await safeJsonParse(response);
-    const cards: DynamicCard[] = Array.isArray(result.cards) ? result.cards : [];
-
-    if (cards.length === 0) {
-      console.warn(`${LOG_PREFIXES.DATA_SERVICE} Zero cards returned`, { params });
-    }
-
-    cache.set(cacheKey, cards);
-    return cards;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`${LOG_PREFIXES.DATA_SERVICE} fetchDynamicCards failed:`, msg);
-    return [];
-  } finally {
-    clearTimeout(timeoutId);
+  // Coalesce duplicate in-flight requests for the same params into one fetch
+  if (inflightRequests.has(cacheKey)) {
+    return inflightRequests.get(cacheKey)!;
   }
+
+  const fetchPromise = (async (): Promise<DynamicCard[]> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.CARDS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Cards API ${response.status}: ${errText.substring(0, 100)}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Cards API returned non-JSON response');
+      }
+
+      const result = await safeJsonParse(response);
+      const cards: DynamicCard[] = Array.isArray(result.cards) ? result.cards : [];
+
+      if (cards.length === 0) {
+        console.warn(`${LOG_PREFIXES.DATA_SERVICE} Zero cards returned`, { params });
+      }
+
+      cache.set(cacheKey, cards);
+      return cards;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`${LOG_PREFIXES.DATA_SERVICE} fetchDynamicCards failed:`, msg);
+      return [];
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  })();
+
+  inflightRequests.set(cacheKey, fetchPromise);
+  fetchPromise.finally(() => inflightRequests.delete(cacheKey));
+  return fetchPromise;
 }

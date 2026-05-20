@@ -767,6 +767,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     }
 
     setInput('');
+    // Clear stale cards so the right panel shows loading state for this new query,
+    // and force the fillMissingCards effect to re-fetch even if the query text matches.
+    setCurrentCards([]);
+    fetchedForQueryRef.current = null;
     const visionAttachments = currentFiles
       .filter(f => f.type === 'image' && f.imageBase64)
       .map(f => ({ name: f.name, base64: f.imageBase64!, mimeType: f.mimeType ?? 'image/jpeg' }));

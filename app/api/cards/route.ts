@@ -3,6 +3,7 @@ import { generateContextualCards } from '@/lib/cards-generator';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { validateBenford } from '@/lib/benford-validator';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import { detectSportFromText } from '@/lib/sport-detection';
 
 // In-memory inflight map: coalesces concurrent requests with identical params
 // into a single generateContextualCards call. Auto-cleaned on promise settle.
@@ -48,7 +49,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { sport, category, limit = 6, userContext, draftGroupId, includeAllCards = false } = body;
+    const { sport: rawSport, category, limit = 6, userContext, draftGroupId, includeAllCards = false } = body;
+
+    // Infer sport from the user's query text when the caller hasn't provided one
+    const sport = rawSport || (userContext ? detectSportFromText(String(userContext)) || undefined : undefined);
+    if (!rawSport && sport) {
+      console.log(`[Cards] userContext: "${String(userContext).slice(0, 60)}" → sport: "${sport}"`);
+    }
 
     const maxCards = includeAllCards ? 50 : 25;
     const clampedLimit = Math.min(Math.max(Number(limit) || 6, 1), maxCards);

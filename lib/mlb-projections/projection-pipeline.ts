@@ -150,7 +150,9 @@ function nameMatchesPlayer(statcastName: string, mlbName: string): boolean {
 export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise<MLBProjectionCardData[]> {
   const { limit = 10, playerName, playerType = 'all' } = opts;
 
-  console.log('[MLBProj] Starting projection pipeline:', opts);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[MLBProj] Starting projection pipeline:', opts);
+  }
 
   // 1. Fetch today's games + Statcast data in parallel
   // We fetch Statcast regardless of games so the no-games fallback can use it.

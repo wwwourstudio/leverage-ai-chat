@@ -290,14 +290,6 @@ export function DynamicCardRenderer({
       <div className="relative group/card animate-card-enter" style={{ animationDelay: `${Math.min((index ?? 0) * 60, 300)}ms` }}>
         {el}
 
-        {/* Top-left: LIVE pulse for confirmed real-time data */}
-        {isLive && (
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 backdrop-blur-sm pointer-events-none animate-badge-pop">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider">Live</span>
-          </span>
-        )}
-
         {/* Top-right: share + pin buttons — revealed on hover, always shown when pinned */}
         <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
           <div className={`flex items-center gap-1 transition-opacity duration-150 pointer-events-auto ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}>

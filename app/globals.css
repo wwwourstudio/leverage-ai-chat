@@ -750,3 +750,6 @@
 @utility animate-delay-300 { animation-delay: 300ms; }
 @utility animate-delay-375 { animation-delay: 375ms; }
 @utility animate-delay-450 { animation-delay: 450ms; }
+
+.font-bebas { font-family: var(--font-bebas, impact, sans-serif); letter-spacing: 0.02em; }
+.font-dm-mono { font-family: var(--font-dm-mono, ui-monospace, monospace); }

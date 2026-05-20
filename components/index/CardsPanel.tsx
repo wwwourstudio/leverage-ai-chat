@@ -43,7 +43,7 @@ export const CardsPanel = memo(function CardsPanel({
   onAsk,
 }: CardsPanelProps) {
   const timeLabel = useRelativeTime(fetchedAt);
-  const hasCards = cards.length > 0;
+  const hasCards = (cards?.length ?? 0) > 0;
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-overlay)]">

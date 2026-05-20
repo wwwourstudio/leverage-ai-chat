@@ -56,7 +56,7 @@ export const CardsPanel = memo(function CardsPanel({
             <span className={cn(
               'text-[10px] font-bold px-1.5 py-0.5 rounded-full',
               fetchedAt && Date.now() - fetchedAt < 30_000
-                ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
+                ? 'bg-blue-500/15 text-blue-400'
                 : 'bg-[var(--bg-elevated)] text-[var(--text-faint)]',
             )}>
               {fetchedAt && Date.now() - fetchedAt < 30_000 ? '● ' : ''}{timeLabel}

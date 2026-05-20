@@ -1300,20 +1300,13 @@ async function _generateContextualCards(
   const normalizedSport = effectiveSport ? sportToApi(effectiveSport) : undefined;
   const displaySport = normalizedSport ? apiToSport(normalizedSport).toUpperCase() : 'MULTI-SPORT';
 
-  console.log('[v0] [CARDS GENERATOR] Generating cards...');
-  console.log('[v0] [CARDS GENERATOR] Input:', { category, sport, normalizedSport, displaySport, multiSport });
-  console.log('[v0] [CARDS GENERATOR] Category:', category, '| Display Sport:', displaySport, '| Count:', count);
-  
   // 'all' category — mix betting + Kalshi cards so the default view shows card variety
   if (category === 'all') {
     if (normalizedSport) {
-      // Sport-specific query → pure betting cards, no Kalshi contamination
-      console.log(`[v0] [CARDS-GEN] All-category with sport=${normalizedSport}: pure betting mode`);
       const cards = await _generateContextualCards('betting', sport, count);
       if (cards.length > 0) setCachedCards(cards, 'all', sport, userContext);
       return cards;
     }
-    console.log('[v0] [CARDS-GEN] All-category mode: generating mixed betting + Kalshi cards');
     const bettingCount = Math.max(1, count - 1);
     const kalshiCount  = Math.max(1, count - bettingCount);
     const [bettingResult, kalshiResult] = await Promise.allSettled([
@@ -1327,7 +1320,8 @@ async function _generateContextualCards(
       setCachedCards(mixed, 'all', sport, userContext);
       return mixed;
     }
-    // Both sources failed — fall back to pure betting cards
+    // Both betting and Kalshi returned 0 cards — log so it shows up in diagnostics
+    console.warn('[v0] [Cards] All sources failed (betting=0, kalshi=0) — falling back to pure betting');
     return _generateContextualCards('betting', sport, count);
   }
 

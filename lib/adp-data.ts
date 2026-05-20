@@ -443,7 +443,6 @@ export async function loadADPFromSupabase(sport = 'mlb', allowStale = false): Pr
       .eq('sport', sport)
       .order('rank', { ascending: true })
       .limit(300);
-    console.log(`[v0] [ADP] Supabase query result: rows=${data?.length ?? 0} error=${error ? error.message : 'none'}`);
     if (error || !data || data.length === 0) return null;
     // Check freshness unless allowStale — compare against cache TTL (4 hours)
     if (!allowStale) {

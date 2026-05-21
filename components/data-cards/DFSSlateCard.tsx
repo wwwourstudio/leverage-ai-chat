@@ -124,46 +124,42 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
         : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_oklch(0.72_0.20_80/0.12)]',
     )}>
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 dark:via-amber-900/5 to-transparent border-b border-[var(--border-subtle)]">
-        <div className="absolute top-0 right-0 w-40 h-20 bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/5 rounded-bl-full blur-3xl pointer-events-none" />
-
-        {/* Breadcrumb + platform badge */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-[var(--foreground)]/60">
-            <Users className="w-3 h-3" />
-            <span className="text-[9px] font-black uppercase tracking-widest">DFS</span>
-            <span className="text-[var(--foreground)]/30">·</span>
-            <span className="text-[9px]">Optimal Lineup</span>
-          </div>
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase tracking-wider">
-            {site}
-          </span>
+      {/* ── Header breadcrumb ───────────────────────────────────────────── */}
+      <div className="relative flex items-center justify-between px-4 py-3 bg-gradient-to-br from-[var(--cat-dfs,oklch(0.72_0.20_80))]/20 to-transparent border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-1.5">
+          <Users className="w-3 h-3 text-[var(--cat-dfs,oklch(0.72_0.20_80))]/70 shrink-0" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--foreground)]/60">DFS</span>
+          <span className="text-[var(--foreground)]/30">·</span>
+          <span className="text-[9px] text-[var(--foreground)]/50">Optimal Lineup</span>
         </div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--cat-dfs,oklch(0.72_0.20_80))]/15 border border-[var(--cat-dfs,oklch(0.72_0.20_80))]/30 text-[var(--cat-dfs,oklch(0.72_0.20_80))] text-[9px] font-black uppercase tracking-wider">
+          {site}
+        </span>
+      </div>
 
-        <h3 className={cn('font-black text-[var(--foreground)] leading-snug', isHero ? 'text-lg' : 'text-sm')}>{title}</h3>
-
-        {/* Hero stats row */}
-        <div className="mt-2.5 flex flex-wrap gap-2 items-center">
+      {/* ── Title + stats ───────────────────────────────────────────────── */}
+      <div className="px-4 pt-3 pb-2.5 border-b border-[var(--border-subtle)]">
+        <h3 className="font-bebas text-[22px] text-[var(--foreground)] leading-none" style={{ letterSpacing: '0.02em' }}>{title}</h3>
+        <div className="flex flex-wrap gap-3 mt-2 items-center">
           <div className="flex flex-col">
-            <span className="text-[8px] font-black uppercase tracking-wider text-[var(--cat-dfs,oklch(0.72_0.20_80))]/70">Salary Used</span>
-            <span className="text-lg font-black text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-tight">{totalSalary}</span>
+            <span className="font-dm-mono text-[9px] uppercase text-[var(--cat-dfs,oklch(0.72_0.20_80))]/70">Salary Used</span>
+            <span className="font-bebas text-[20px] text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-tight" style={{ letterSpacing: '0.02em' }}>{totalSalary}</span>
           </div>
           <div className="w-px h-8 bg-white/10" />
           <div className="flex flex-col">
-            <span className="text-[8px] font-black uppercase tracking-wider text-blue-400/70">Proj Pts</span>
-            <span className="text-lg font-black text-blue-400 tabular-nums leading-tight">{totalProjPts}</span>
+            <span className="font-dm-mono text-[9px] uppercase text-blue-400/70">Proj Pts</span>
+            <span className="font-bebas text-[20px] text-blue-400 tabular-nums leading-tight" style={{ letterSpacing: '0.02em' }}>{totalProjPts}</span>
           </div>
           {topStack && (
             <>
               <div className="w-px h-8 bg-white/10" />
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-black">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-dm-mono text-[10px]">
                 Stack: {topStack}
               </span>
             </>
           )}
           {slateLabel && (
-            <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wide">
+            <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-dm-mono text-[9px] text-[var(--text-muted)] uppercase">
               {slateLabel}
             </span>
           )}
@@ -177,86 +173,83 @@ export const DFSSlateCard = memo(function DFSSlateCard({ title, data, onAnalyze,
         </div>
       )}
 
-      {/* ── Column headers ──────────────────────────────────────────────── */}
-      <div className="px-3 pt-3 pb-1 grid grid-cols-[32px,1fr,64px,48px,36px] gap-2 text-[8px] font-black uppercase tracking-wider text-[var(--text-faint)]">
-        <span />
-        <span>Player</span>
-        <span className="text-right">Salary</span>
-        <span className="text-right">Proj</span>
-        <span className="text-right">Val</span>
-      </div>
-
       {/* ── Roster rows ─────────────────────────────────────────────────── */}
       {slate.length === 0 ? (
         <div className="px-4 pb-4"><CardsEmptyState message="No playable DFS lineup available for this slate yet." /></div>
       ) : (
         <div className="pb-1 divide-y divide-[var(--border-subtle)]/40">
           {slate.map((p, i) => {
-            const ownNum     = parseFloat(p.ownership)   || 0;
-            const dkValNum   = parseFloat(p.dkValue)     || 0;
-            const matchupNum = p.matchupScore != null ? parseFloat(String(p.matchupScore)) : null;
-            const isStacked  = Boolean(p.stackTeam);
+            const ownNum   = parseFloat(p.ownership) || 0;
+            const dkValNum = parseFloat(p.dkValue)   || 0;
+            const isStacked = Boolean(p.stackTeam);
 
             return (
               <div
                 key={`${p.player}-${i}`}
                 className={cn(
-                  'flex items-center gap-2 px-3 py-2.5 transition-colors',
-                  isStacked
-                    ? 'border-l-2 border-l-indigo-400 bg-indigo-500/5'
-                    : i % 2 === 0 ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-elevated)]/30',
+                  'flex items-center gap-2.5 px-3 py-2.5 transition-colors',
+                  isStacked ? 'border-l-2 border-l-indigo-400 bg-indigo-500/5' : i % 2 === 0 ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-elevated)]/30',
                 )}
               >
-                <PositionBadge position={p.position} />
-
-                {/* Name + team + ownership bar */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-black text-[var(--foreground)] text-[12px] truncate">{p.player}</span>
-                    <span className="text-[10px] font-bold text-[var(--foreground)]/40 shrink-0">{p.team}</span>
-                    {p.confirmedStarter && (
-                      <span className="shrink-0 w-2 h-2 rounded-full bg-blue-400" title="Confirmed starter" />
-                    )}
-                    {isStacked && (
-                      <span className="ml-auto shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/25 text-[8px] font-black text-indigo-300 uppercase tracking-wide">
-                        STK
-                      </span>
-                    )}
-                  </div>
-                  {/* Ownership mini-bar */}
-                  <div className="mt-1 h-[3px] rounded-full bg-[var(--bg-elevated)] max-w-[80px] overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all duration-500',
-                        ownNum >= 35 ? 'bg-red-400' : ownNum >= 20 ? 'bg-amber-400' : ownNum >= 10 ? 'bg-blue-400' : 'bg-blue-400'
-                      )}
-                      style={{ width: `${Math.min(100, ownNum)}%` }}
-                    />
-                  </div>
-                  {ownNum > 0 && (
-                    <span className="text-[8px] text-[var(--text-faint)] tabular-nums">{ownNum.toFixed(0)}% own</span>
+                {/* Avatar with position color */}
+                <div className={cn('relative w-[38px] h-[38px] rounded-xl flex items-center justify-center shrink-0', POS_COLORS[p.position]?.bg ?? 'bg-slate-500/20')}>
+                  <span className={cn('font-dm-mono text-[10px] font-bold', POS_COLORS[p.position]?.text ?? 'text-slate-300')}>
+                    {p.position}
+                  </span>
+                  {/* Top pick star — contained within avatar */}
+                  {i === 0 && (
+                    <span className="absolute -top-1 -right-1 w-[14px] h-[14px] flex items-center justify-center rounded-full bg-amber-500/90 text-[8px] leading-none">
+                      ★
+                    </span>
                   )}
                 </div>
 
-                {/* Salary */}
-                <span className="text-[11px] font-black text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums w-16 text-right">{p.salary}</span>
+                {/* Player info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-[var(--foreground)] truncate">{p.player}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={cn('font-dm-mono text-[9px] uppercase px-1 py-0.5 rounded border', POS_COLORS[p.position]?.text ?? 'text-slate-300', POS_COLORS[p.position]?.bg ?? 'bg-slate-500/20', POS_COLORS[p.position]?.border ?? 'border-slate-500/35')}>
+                      {p.position}
+                    </span>
+                    <span className="font-dm-mono text-[10px] text-[var(--text-muted)]">{p.team}{p.stackTeam ? ` vs ${p.stackTeam}` : ''}</span>
+                  </div>
+                  {/* Ownership bar */}
+                  {ownNum > 0 && (
+                    <div className="mt-1 h-[2px] rounded-full bg-[var(--bg-elevated)] max-w-[70px] overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all duration-500',
+                          ownNum >= 35 ? 'bg-red-400' : ownNum >= 20 ? 'bg-amber-400' : 'bg-blue-400'
+                        )}
+                        style={{ width: `${Math.min(100, ownNum)}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
 
-                {/* Projection */}
-                <span className="text-[11px] font-black text-blue-400 tabular-nums w-12 text-right">{p.projection}</span>
-
-                {/* Matchup dot */}
-                {matchupNum !== null && !isNaN(matchupNum) && (
-                  <div
-                    className={cn(
-                      'w-2 h-2 rounded-full shrink-0',
-                      matchupNum >= 70 ? 'bg-blue-400' : matchupNum >= 50 ? 'bg-amber-400' : 'bg-red-400',
-                    )}
-                    title={`Matchup: ${Math.round(matchupNum)}/100`}
-                  />
-                )}
-
-                {/* Value grade */}
-                <div className="w-9 flex justify-end">
-                  <ValueGrade score={dkValNum} />
+                {/* Stats block */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex flex-col items-end">
+                    <span className="font-dm-mono text-[14px] text-blue-400 tabular-nums leading-tight">{p.projection}</span>
+                    <span className="font-dm-mono text-[9px] uppercase text-[var(--text-faint)]">Proj</span>
+                  </div>
+                  <div className="w-px h-6 bg-[var(--border-subtle)]" />
+                  <div className="flex flex-col items-end">
+                    <span className="font-dm-mono text-[11px] text-[var(--cat-dfs,oklch(0.72_0.20_80))] tabular-nums leading-tight">{p.salary}</span>
+                    <span className="font-dm-mono text-[9px] uppercase text-[var(--text-faint)]">Sal</span>
+                  </div>
+                  {/* Value multiplier badge */}
+                  {dkValNum > 0 && (() => {
+                    const valCls = dkValNum >= 4.0
+                      ? 'bg-green-500/15 border-green-500/30 text-green-300'
+                      : dkValNum >= 3.5
+                      ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                      : 'bg-violet-500/15 border-violet-500/30 text-violet-300';
+                    return (
+                      <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded-lg border font-dm-mono text-[10px] font-medium', valCls)}>
+                        {dkValNum.toFixed(1)}x
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             );

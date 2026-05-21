@@ -45,6 +45,16 @@ export const CardsPanel = memo(function CardsPanel({
   const timeLabel = useRelativeTime(fetchedAt);
   const hasCards = (cards?.length ?? 0) > 0;
 
+  const [isStale, setIsStale] = useState(false);
+  useEffect(() => {
+    if (!cards || cards.length === 0) return;
+    const hasLive = cards.some(c => c.realData === true);
+    if (!hasLive) return;
+    setIsStale(false);
+    const id = setTimeout(() => setIsStale(true), 5 * 60_000);
+    return () => clearTimeout(id);
+  }, [cards]);
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-overlay)]">
       {/* Header */}
@@ -73,6 +83,22 @@ export const CardsPanel = memo(function CardsPanel({
           Refresh
         </button>
       </div>
+
+      {/* Stale data banner */}
+      {isStale && (
+        <div className="flex items-center gap-2 mx-3 mt-2 px-4 py-2 rounded-[10px] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.25)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span className="text-[11px] text-amber-300 flex-1">Live data may be stale</span>
+          {onRefresh && (
+            <button
+              onClick={() => { setIsStale(false); onRefresh?.(); }}
+              className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-bold hover:bg-amber-500/30 transition-colors"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">

@@ -2707,10 +2707,15 @@ async function _generateContextualCards(
             });
             // Sport-specific DFS projection config
             const dfsCfg: Record<string, { posLabel: string; projMult: number; sport: string; stackTip: string }> = {
+              // projMult applied to game O/U to get realistic DK point projection:
+              // NBA:  O/U ~220 × 0.135 ≈ 30 pts (top guard/forward range)
+              // NFL:  O/U ~48  × 0.52  ≈ 25 pts (QB range)
+              // NHL:  O/U ~6   × 2.5   ≈ 15 pts (top forward range)
+              // MLB:  O/U ~9   × 1.6   ≈ 14 pts (SP value floor), O/U 13 × 1.6 ≈ 21 (ace ceiling)
               basketball_nba:        { posLabel: 'G/F', projMult: 0.135, sport: 'NBA', stackTip: 'guards and forwards' },
-              americanfootball_nfl:  { posLabel: 'QB',  projMult: 0.25,  sport: 'NFL', stackTip: 'QB-WR stacks' },
-              icehockey_nhl:         { posLabel: 'W',   projMult: 0.15,  sport: 'NHL', stackTip: 'top-line forwards and power-play units' },
-              baseball_mlb:          { posLabel: 'SP',  projMult: 2.9,   sport: 'MLB', stackTip: '4-5 man batting order stacks' },
+              americanfootball_nfl:  { posLabel: 'QB',  projMult: 0.52,  sport: 'NFL', stackTip: 'QB-WR stacks' },
+              icehockey_nhl:         { posLabel: 'W',   projMult: 2.5,   sport: 'NHL', stackTip: 'top-line forwards and power-play units' },
+              baseball_mlb:          { posLabel: 'SP',  projMult: 1.6,   sport: 'MLB', stackTip: '4-5 man batting order stacks' },
             };
             const cfg = dfsCfg[normalizedSport] ?? { posLabel: 'FLEX', projMult: 0.20, sport: displaySport ?? 'DFS', stackTip: 'top scorers' };
 
@@ -2758,6 +2763,7 @@ async function _generateContextualCards(
                 player: _topPlayer,
                 team: _topWord,
                 position: cfg.posLabel,
+                sport: normalizedSport,
                 salary: `$${topSalary.toLocaleString()}`,
                 projection: topProj.toFixed(1),
                 ownership: `${Math.min(35, Math.round(8 + topProj / 4))}%`,
@@ -2793,6 +2799,7 @@ async function _generateContextualCards(
                   player: _valPlayer,
                   team: _valWord,
                   position: cfg.posLabel,
+                  sport: normalizedSport,
                   salary: `$${valSalary.toLocaleString()}`,
                   projection: valProj.toFixed(1),
                   ownership: `${Math.min(20, Math.round(5 + valProj / 5))}%`,
@@ -2828,6 +2835,7 @@ async function _generateContextualCards(
                   player: _conPlayer,
                   team: _conWord,
                   position: cfg.posLabel,
+                  sport: normalizedSport,
                   salary: `$${conSalary.toLocaleString()}`,
                   projection: conProj.toFixed(1),
                   ownership: `${Math.max(4, Math.round(4 + conProj / 8))}%`,

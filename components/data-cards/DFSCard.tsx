@@ -14,9 +14,11 @@ function getTeamLogoAbbr(teamName: string): string | null {
 function TeamLogo({ team, sport, size = 24 }: { team: string; sport?: string; size?: number }) {
   const abbr = getTeamLogoAbbr(team);
   if (!abbr) return null;
-  const slug = sport?.includes('basketball') ? 'nba'
-    : sport?.includes('baseball') ? 'mlb'
-    : sport?.includes('hockey') ? 'nhl'
+  const s = sport?.toLowerCase() ?? '';
+  const slug = s.includes('basketball') || s === 'nba' ? 'nba'
+    : s.includes('baseball') || s === 'mlb' ? 'mlb'
+    : s.includes('hockey') || s === 'nhl' ? 'nhl'
+    : s.includes('football') || s === 'nfl' || s === 'ncaaf' ? 'nfl'
     : 'nfl';
   const src = `https://a.espncdn.com/i/teamlogos/${slug}/500/${abbr}.png`;
   return (
@@ -406,6 +408,43 @@ export const DFSCard = memo(function DFSCard({
             </div>
           </div>
         )}
+
+        {/* Contrarian / low-owned picks layout */}
+        {!isStackPlay && cardCategory === 'contrarian' && hasCorePlay && (() => {
+          // Parse contrarian targets from data — could be in targetPlayers or a players array
+          const targets: Array<{ name: string; ownership: string; reason?: string }> =
+            Array.isArray(data.players) ? data.players :
+            Array.isArray(data.contrarianPicks) ? data.contrarianPicks :
+            player ? [{ name: player, ownership: String(ownership ?? ''), reason: description }] : [];
+
+          if (targets.length === 0) return null;
+          return (
+            <div className="space-y-1.5">
+              {targets.slice(0, 5).map((t, idx) => {
+                const ownPct = parseFloat(String(t.ownership ?? '0').replace(/[^0-9.]/g, '')) || 0;
+                const ownCls = ownPct < 10
+                  ? 'bg-green-500/15 border-green-500/30 text-green-300'
+                  : ownPct <= 20
+                  ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                  : 'bg-red-500/15 border-red-500/30 text-red-300';
+                return (
+                  <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                    <span className="font-bebas text-[20px] text-[var(--text-faint)] min-w-[22px] leading-none" style={{ letterSpacing: '0.02em' }}>
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-medium text-[var(--foreground)] truncate">{t.name}</p>
+                      {t.reason && <p className="font-dm-mono text-[10px] text-[var(--text-muted)] truncate">{t.reason}</p>}
+                    </div>
+                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full border font-dm-mono text-[10px]', ownCls)}>
+                      {ownPct > 0 ? `${ownPct.toFixed(0)}%` : t.ownership}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Empty state */}
         {!isStackPlay && !hasCorePlay && (

@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import {
+  requireAuth,
+  AuthRequiredError,
+  rateLimitGuard,
+  checkContentLength,
+  parseJsonBody,
+  JsonParseError,
+  badRequest,
+  unauthorized,
+  internalError,
+} from '@/lib/api/route-helpers';
 
 /**
  * GET /api/settings
@@ -9,11 +18,7 @@ import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
-    }
+    const { supabase, user } = await requireAuth();
 
     // Fetch in parallel — maybeSingle() returns null (not 406) when row is absent
     const [profileResult, prefsResult, statsResult] = await Promise.allSettled([
@@ -87,8 +92,9 @@ export async function GET() {
       },
     });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized('Not authenticated');
     console.error('[v0] [API/settings] GET error:', err);
-    return NextResponse.json({ success: false, error: 'Failed to load settings' }, { status: 500 });
+    return internalError('Failed to load settings');
   }
 }
 
@@ -100,33 +106,17 @@ export async function GET() {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
-    }
+    const { supabase, user } = await requireAuth();
 
     // Rate limit: 10 settings updates per minute per user
-    const rl = checkRateLimit('settings-patch', getRateLimitId(req, user.id), { limit: 10, windowMs: 60_000 });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many requests' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
-      );
-    }
+    const rlResult = rateLimitGuard(req, user.id, 'settings-patch', { limit: 10, windowMs: 60_000 });
+    if (rlResult) return rlResult;
 
-    // Reject oversized payloads before parsing
-    const contentLength = Number(req.headers.get('content-length') ?? 0);
-    if (contentLength > 50_000) {
-      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
-    }
+    // Reject oversized payloads before parsing (max 50 KB)
+    const clResult = checkContentLength(req, 50_000);
+    if (clResult) return clResult;
 
-    let body: Record<string, unknown>;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const body = await parseJsonBody<Record<string, unknown>>(req);
 
     // Update display name via Supabase auth metadata
     if (typeof body.name === 'string' && body.name.trim()) {
@@ -197,9 +187,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized('Not authenticated');
+    if (err instanceof JsonParseError) return badRequest(err.message);
     console.error('[v0] [API/settings] PATCH error:', err);
-    // Return a generic message to avoid leaking internal schema details
-    return NextResponse.json({ success: false, error: 'Failed to save settings' }, { status: 500 });
+    return internalError('Failed to save settings');
   }
 }

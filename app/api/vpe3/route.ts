@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { internalError, badRequest, parseJsonBody, JsonParseError } from '@/lib/api/route-helpers';
 import { runVPEEngine } from '@/lib/vpe3/engine';
 import {
   mockAcePitcher,
@@ -295,10 +296,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error('[v0] [API/vpe3] Error running VPE 3.0:', error);
-    return NextResponse.json(
-      { success: false, error: 'VPE 3.0 engine failed' },
-      { status: 500 },
-    );
+    return internalError('VPE 3.0 engine failed');
   }
 }
 
@@ -313,7 +311,7 @@ interface VPE3RequestBody {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: VPE3RequestBody = await request.json();
+    const body = await parseJsonBody<VPE3RequestBody>(request);
 
     // If caller doesn't supply data, seed from live Statcast rather than mock
     let hitters = body.hitters;
@@ -348,10 +346,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
+    if (error instanceof JsonParseError) return badRequest('Invalid JSON body');
     console.error('[v0] [API/vpe3] Error running VPE 3.0:', error);
-    return NextResponse.json(
-      { success: false, error: 'VPE 3.0 engine failed' },
-      { status: 500 },
-    );
+    return internalError('VPE 3.0 engine failed');
   }
 }

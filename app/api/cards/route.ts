@@ -3,6 +3,7 @@ import { generateContextualCards } from '@/lib/cards-generator';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants';
 import { validateBenford } from '@/lib/benford-validator';
 import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import { isRateLimitError } from '@/lib/api/route-helpers';
 import { detectSportFromText } from '@/lib/sport-detection';
 
 // In-memory inflight map: coalesces concurrent requests with identical params
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     console.error('[API/cards] Error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     const isTimeout = msg.toLowerCase().includes('timeout') || (error as any)?.name === 'AbortError';
-    const isRateLimit = msg.includes('429') || msg.toLowerCase().includes('rate limit');
+    const isRateLimit = isRateLimitError(error);
     const userMessage = isTimeout
       ? 'Card generation timed out — try a more specific query'
       : isRateLimit

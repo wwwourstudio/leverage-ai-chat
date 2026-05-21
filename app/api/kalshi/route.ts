@@ -18,6 +18,7 @@ import {
 } from '@/lib/kalshi/index';
 import { createClient } from '@/lib/supabase/server';
 import { TtlCache } from '@/lib/utils/cache';
+import { isRateLimitError } from '@/lib/api/route-helpers';
 
 // No edge runtime — Node.js runtime needed for in-memory cache and full API surface
 
@@ -38,11 +39,6 @@ function kalshiActivityScore(m: { priceIsReal?: boolean; yesBid?: number; yesAsk
     + (m.volume24h ?? 0) * 10
     + (m.volume ?? 0)
     + (m.openInterest ?? 0);
-}
-
-function isRateLimitError(err: unknown): boolean {
-  const msg = String(err);
-  return msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too_many_requests');
 }
 
 /**

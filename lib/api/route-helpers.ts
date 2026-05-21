@@ -123,6 +123,18 @@ export function parseIntParam(
   return Math.min(max, Math.max(min, isNaN(raw) ? defaultVal : raw));
 }
 
+// ── Rate limit error detection ────────────────────────────────────────────────
+
+/** Returns true when an upstream error signals a 429 / rate-limit response. */
+export function isRateLimitError(err: unknown): boolean {
+  const msg = String(err);
+  return (
+    msg.includes('429') ||
+    msg.toLowerCase().includes('rate limit') ||
+    msg.toLowerCase().includes('too_many_requests')
+  );
+}
+
 // ── Sport key validation ──────────────────────────────────────────────────────
 
 export class InvalidSportError extends Error {

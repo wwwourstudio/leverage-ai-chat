@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { parseJsonBody, JsonParseError, badRequest, internalError } from '@/lib/api/route-helpers';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await parseJsonBody<{ vote: string; messageExcerpt?: string; sessionId?: string }>(request);
     const { vote, messageExcerpt, sessionId } = body;
 
     if (!vote || !['helpful', 'improve'].includes(vote)) {
-      return NextResponse.json({ success: false, error: 'Invalid vote' }, { status: 400 });
+      return badRequest('Invalid vote');
     }
 
     // Try to persist to Supabase — degrade gracefully if not configured
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof JsonParseError) return badRequest('Invalid request body');
     console.error('[API/feedback] Error:', error);
-    return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 });
+    return internalError('Internal error');
   }
 }

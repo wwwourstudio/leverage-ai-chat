@@ -14,9 +14,11 @@ function getTeamLogoAbbr(teamName: string): string | null {
 function TeamLogo({ team, sport, size = 24 }: { team: string; sport?: string; size?: number }) {
   const abbr = getTeamLogoAbbr(team);
   if (!abbr) return null;
-  const slug = sport?.includes('basketball') ? 'nba'
-    : sport?.includes('baseball') ? 'mlb'
-    : sport?.includes('hockey') ? 'nhl'
+  const s = sport?.toLowerCase() ?? '';
+  const slug = s.includes('basketball') || s === 'nba' ? 'nba'
+    : s.includes('baseball') || s === 'mlb' ? 'mlb'
+    : s.includes('hockey') || s === 'nhl' ? 'nhl'
+    : s.includes('football') || s === 'nfl' || s === 'ncaaf' ? 'nfl'
     : 'nfl';
   const src = `https://a.espncdn.com/i/teamlogos/${slug}/500/${abbr}.png`;
   return (

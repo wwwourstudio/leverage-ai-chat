@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('[API/opportunities] Error:', err);
     return NextResponse.json(
-      { success: false, opportunities: [], error: err instanceof Error ? err.message : 'Failed' },
+      { success: false, opportunities: [], error: 'Internal error' },
       { status: 500 }
     );
   }

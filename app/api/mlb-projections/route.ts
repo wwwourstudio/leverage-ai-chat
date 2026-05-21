@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
     const isTimeout = msg.includes('timed out');
     console.error('[API/mlb-projections] Error:', msg);
     return NextResponse.json(
-      { success: false, error: msg, cards: [], count: 0 },
+      { success: false, error: isTimeout ? 'MLB projections timed out' : 'MLB projections failed', cards: [], count: 0 },
       { status: isTimeout ? 504 : 500 },
     );
   }

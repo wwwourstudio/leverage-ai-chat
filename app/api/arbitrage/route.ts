@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('[API/arbitrage] Error:', err);
     return NextResponse.json(
-      { success: false, opportunities: [], error: err instanceof Error ? err.message : 'Scan failed' },
+      { success: false, opportunities: [], error: 'Arbitrage scan failed' },
       { status: 500 }
     );
   }

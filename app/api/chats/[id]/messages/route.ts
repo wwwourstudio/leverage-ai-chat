@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { HTTP_STATUS } from '@/lib/constants';
+import {
+  requireAuth,
+  AuthRequiredError,
+  unauthorized,
+  badRequest,
+  notFound,
+  internalError,
+  parseJsonBody,
+  JsonParseError,
+  checkContentLength,
+} from '@/lib/api/route-helpers';
 
 // ============================================================================
 // GET /api/chats/[id]/messages — Load messages for a thread
@@ -12,15 +21,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
+    const { supabase } = await requireAuth();
 
     const { data: messages, error } = await supabase
       .from('chat_messages')
@@ -31,19 +32,14 @@ export async function GET(
 
     if (error) {
       console.error('[v0] [API/chats/messages] GET error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch messages' },
-        { status: HTTP_STATUS.INTERNAL_ERROR }
-      );
+      return internalError('Failed to fetch messages');
     }
 
     return NextResponse.json({ success: true, messages: messages ?? [] });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
     console.error('[v0] [API/chats/messages] GET error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }
 
@@ -57,28 +53,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
+    const { supabase, user } = await requireAuth();
 
     // Reject oversized payloads before parsing
-    const contentLength = Number(request.headers.get('content-length') ?? 0);
-    if (contentLength > 500_000) { // 500KB — cards JSONB can add ~50KB per message
-      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
-    }
+    const sizeError = checkContentLength(request, 500_000); // 500KB — cards JSONB can add ~50KB per message
+    if (sizeError) return sizeError;
 
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: HTTP_STATUS.BAD_REQUEST });
-    }
+    const body = await parseJsonBody<Record<string, unknown>>(request);
 
     // Normalize to array: batch mode uses `{ messages: [...] }`, single uses `{ role, content, ... }`
     type MsgInput = { role: string; content: string; model_used?: string; confidence?: number; is_welcome?: boolean; cards?: unknown[] };
@@ -88,10 +69,7 @@ export async function POST(
       : [{ role: body.role as string, content: body.content as string, model_used: body.model_used as string | undefined, confidence: body.confidence as number | undefined, is_welcome: (body.is_welcome as boolean | undefined) ?? false, cards: body.cards as unknown[] | undefined }];
 
     if (!msgs.length || msgs.some(m => !m.role || m.content == null)) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: role, content' },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+      return badRequest('Missing required fields: role, content');
     }
 
     // Verify thread ownership before inserting (belt-and-suspenders beyond RLS).
@@ -119,10 +97,7 @@ export async function POST(
 
       if (createErr) {
         console.error('[v0] [API/chats/messages] Could not recreate thread:', createErr);
-        return NextResponse.json(
-          { success: false, error: 'Thread not found' },
-          { status: HTTP_STATUS.NOT_FOUND }
-        );
+        return notFound('Thread not found');
       }
       console.log(`[v0] [API/chats/messages] Auto-recreated stale thread ${id} for user ${user.id}`);
     }
@@ -144,10 +119,7 @@ export async function POST(
 
     if (error) {
       console.error('[v0] [API/chats/messages] POST error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Failed to save message' },
-        { status: HTTP_STATUS.INTERNAL_ERROR }
-      );
+      return internalError('Failed to save message');
     }
 
     const lastMsg = msgs[msgs.length - 1];
@@ -166,10 +138,9 @@ export async function POST(
       ? { success: true, messages: inserted ?? [] }
       : { success: true, message: (inserted ?? [])[0] });
   } catch (err) {
+    if (err instanceof AuthRequiredError) return unauthorized();
+    if (err instanceof JsonParseError) return badRequest('Invalid JSON body');
     console.error('[v0] [API/chats/messages] POST error:', err);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
-    );
+    return internalError();
   }
 }

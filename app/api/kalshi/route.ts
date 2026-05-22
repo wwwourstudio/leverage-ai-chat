@@ -104,7 +104,8 @@ export async function GET(request: Request) {
     if (ticker) {
       const market = await getMarketByTicker(ticker);
       if (!market) {
-        return NextResponse.json({ success: false, error: 'Market not found', markets: [] }, { status: 404 });
+        // Return 200 (not 404) so browsers don't log a console error for expired tickers
+        return NextResponse.json({ success: false, error: 'Market not found', markets: [], trades: [], orderbook: null });
       }
 
       const extras: Record<string, any> = {};

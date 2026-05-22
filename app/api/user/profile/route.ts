@@ -4,6 +4,9 @@ import {
   AuthRequiredError,
   unauthorized,
   internalError,
+  parseJsonBody,
+  JsonParseError,
+  badRequest,
 } from '@/lib/api/route-helpers';
 
 /**
@@ -48,7 +51,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const { supabase, user } = await requireAuth();
 
-    const body = await req.json();
+    const body = await parseJsonBody<{ name?: string; avatar?: string }>(req);
     const metadata: Record<string, string> = {};
     if (typeof body.name === 'string' && body.name.trim()) {
       metadata['full_name'] = body.name.trim().slice(0, 100);
@@ -64,6 +67,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof AuthRequiredError) return unauthorized();
+    if (err instanceof JsonParseError) return badRequest('Invalid request body');
     console.error('[API/user/profile PATCH]', err);
     return internalError('Failed to update profile');
   }

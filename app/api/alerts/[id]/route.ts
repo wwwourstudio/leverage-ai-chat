@@ -82,7 +82,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof AuthRequiredError) return unauthorized();
-    if (err instanceof JsonParseError) return badRequest(err.message);
     console.error('[Alerts] DELETE error:', err);
     return internalError();
   }

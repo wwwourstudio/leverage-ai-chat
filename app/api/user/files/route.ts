@@ -4,6 +4,9 @@ import {
   AuthRequiredError,
   unauthorized,
   internalError,
+  parseJsonBody,
+  JsonParseError,
+  badRequest,
 } from '@/lib/api/route-helpers';
 
 /**
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
   try {
     const { supabase, user } = await requireAuth();
 
-    const body = await req.json();
+    const body = await parseJsonBody<{ files: unknown[] }>(req);
     const files = Array.isArray(body.files) ? body.files.slice(0, 20) : [];
 
     // Strip large binary fields before storing (imageBase64 can be MBs)
@@ -63,6 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, count: sanitized.length });
   } catch (err) {
     if (err instanceof AuthRequiredError) return unauthorized();
+    if (err instanceof JsonParseError) return badRequest('Invalid request body');
     console.error('[API/user/files POST]', err);
     return internalError('Failed to save files');
   }

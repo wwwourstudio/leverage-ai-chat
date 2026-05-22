@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseTSV, saveADPToSupabase, clearADPCache } from '@/lib/adp-data';
 import { clearNFLADPCache } from '@/lib/nfl-adp-data';
+import { badRequest, internalError } from '@/lib/api/route-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -12,11 +13,11 @@ export async function POST(req: NextRequest) {
     const sport = ((formData.get('sport') as string | null) ?? 'mlb').toLowerCase();
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
+      return badRequest('No file provided');
     }
 
     if (!['mlb', 'nfl'].includes(sport)) {
-      return NextResponse.json({ success: false, error: 'sport must be "mlb" or "nfl"' }, { status: 400 });
+      return badRequest('sport must be "mlb" or "nfl"');
     }
 
     const text = await file.text();
@@ -68,8 +69,7 @@ export async function POST(req: NextRequest) {
       message: `Successfully imported ${saved} ${sport.toUpperCase()} players. Data is now live for all users.`,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[v0] [ADP] Upload failed:', msg);
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    console.error('[v0] [ADP] Upload failed:', err instanceof Error ? err.message : String(err));
+    return internalError('ADP upload failed');
   }
 }

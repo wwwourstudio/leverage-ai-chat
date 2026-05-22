@@ -97,13 +97,14 @@ describe('GET /api/kalshi', () => {
     expect(vi.mocked(getMarketByTicker)).toHaveBeenCalledWith('NBA-2026-CELTICS-CHAMP');
   });
 
-  it('returns 404 when the ticker does not exist', async () => {
+  it('returns 200 with success:false when the ticker does not exist', async () => {
     vi.mocked(getMarketByTicker).mockResolvedValue(null);
 
     const res = await GET(makeGetRequest({ ticker: 'NONEXISTENT' }));
     const body = await res.json();
 
-    expect(res.status).toBe(404);
+    // 200 (not 404) so browsers don't log console errors for expired tickers
+    expect(res.status).toBe(200);
     expect(body.success).toBe(false);
     expect(body.error).toMatch(/not found/i);
   });

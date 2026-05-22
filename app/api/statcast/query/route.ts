@@ -92,10 +92,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data, count: count ?? data.length });
   } catch (err) {
     console.error('[API/statcast/query] Unexpected error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal server error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -171,9 +168,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data, count: count ?? data.length });
   } catch (err) {
     console.error('[API/statcast/query] Unexpected GET error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal server error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

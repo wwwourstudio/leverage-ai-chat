@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimit, getRateLimitId } from '@/lib/middleware/rate-limit';
+import { rateLimitGuard, checkContentLength, parseJsonBody, JsonParseError, badRequest } from '@/lib/api/route-helpers';
 
 /**
  * GET /api/user/instructions
@@ -65,16 +65,15 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     // Reject oversized payloads before parsing
-    const contentLength = Number(request.headers.get('content-length') ?? 0);
-    if (contentLength > 10_000) {
-      return NextResponse.json({ success: false, error: 'Request too large' }, { status: 413 });
-    }
+    const sizeError = checkContentLength(request, 10_000);
+    if (sizeError) return sizeError;
 
     let body: Record<string, unknown>;
     try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+      body = await parseJsonBody<Record<string, unknown>>(request);
+    } catch (e) {
+      if (e instanceof JsonParseError) return badRequest('Invalid JSON body');
+      throw e;
     }
     const rawInstructions: string = typeof body?.instructions === 'string'
       ? body.instructions.slice(0, 2000)
@@ -96,13 +95,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // Rate limit: 10 instruction saves per minute per user
-    const rl = checkRateLimit('instructions-put', getRateLimitId(request, user.id), { limit: 10, windowMs: 60_000 });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many requests' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
-      );
-    }
+    const rlError = rateLimitGuard(request, user.id, 'instructions-put', { limit: 10, windowMs: 60_000 });
+    if (rlError) return rlError;
 
     const { error } = await supabase.from('user_preferences').upsert(
       { user_id: user.id, custom_instructions: instructions, updated_at: new Date().toISOString() },

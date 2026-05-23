@@ -308,16 +308,47 @@ export async function buildEnrichedPrompt(
         let _serverEvents: any[] | null = await cacheGet<any[]>(_oddsCacheKey).catch(() => null);
 
         if (_serverEvents === null) {
+          // Prefer Supabase live_odds_cache (populated by 5-min cron) over direct Odds API
+          // calls — avoids burning API quota on every analyze request.
+          try {
+            const { createClient: _sbClient } = await import('@/lib/supabase/server');
+            const _sb2 = await _sbClient();
+            const { data: _cachedRows } = await _sb2
+              .from('live_odds_cache')
+              .select('home_team, away_team, commence_time, bookmakers')
+              .eq('sport_key', _sportKey)
+              .gt('expires_at', new Date().toISOString())
+              .limit(20);
+            if (_cachedRows && _cachedRows.length > 0) {
+              _serverEvents = _cachedRows.map((r: any) => ({
+                away_team: r.away_team,
+                home_team: r.home_team,
+                commence_time: r.commence_time,
+                bookmakers: r.bookmakers ?? [],
+                sport_key: _sportKey,
+              }));
+              void cacheSet(_oddsCacheKey, _serverEvents, 120);
+              console.log(`[v0] [ANALYZE] Supabase odds cache hit for ${_sportKey} (${_serverEvents.length} games)`);
+            }
+          } catch {
+            // Supabase unavailable — fall through to direct API
+          }
+        }
+
+        if (_serverEvents === null) {
           _serverEvents = await Promise.race([
             fetchLiveOdds(_sportKey, { apiKey: _oddsKey, markets: ['h2h', 'spreads', 'totals'], regions: ['us'], oddsFormat: 'american' }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)), // was 8000
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)),
           ]).catch(() => null);
           // Cache the result (including empty arrays — no live games IS a valid cached state)
           if (Array.isArray(_serverEvents)) {
             void cacheSet(_oddsCacheKey, _serverEvents, 120);
           }
+          if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {
+            console.log(`[v0] [ANALYZE] Direct Odds API fetch for ${_sportKey} (${_serverEvents.length} games)`);
+          }
         } else {
-          console.log(`[v0] [ANALYZE] Odds cache hit for ${_sportKey}`);
+          console.log(`[v0] [ANALYZE] Redis odds cache hit for ${_sportKey}`);
         }
 
         if (Array.isArray(_serverEvents) && _serverEvents.length > 0) {

@@ -283,7 +283,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
   // Log why we ended with zero projections (pre-dawn cron runs before probable
   // pitchers / lineups are posted is the most common cause).
   if (projections.length === 0) {
-    console.warn(
+    console.log(
       `[MLBProj] Zero projections. games=${games.length} ` +
       `pitchers=${diag.pitchersTotal} (skipped-no-statcast=${diag.pitchersSkippedNoStatcast}) ` +
       `hitters=${diag.hittersTotal} (skipped-no-statcast=${diag.hittersSkippedNoStatcast}) ` +
@@ -294,7 +294,7 @@ export async function runProjectionPipeline(opts: PipelineOptions = {}): Promise
     // (pre-dawn / early morning). Fall back to Statcast-only projections so DFS cards
     // show real player data instead of empty results.
     if (diag.pitchersTotal === 0 || diag.gamesWithoutLineups === games.length) {
-      console.warn(`[MLBProj] Falling back to Statcast-only cards (pitchers=${diag.pitchersTotal}, gamesWithoutLineups=${diag.gamesWithoutLineups}/${games.length})`);
+      console.log(`[MLBProj] Pre-lineup state — falling back to Statcast-only cards (pitchers=${diag.pitchersTotal}, gamesWithoutLineups=${diag.gamesWithoutLineups}/${games.length})`);
       return buildNoGamesCards({ allHitters, allPitchers, playerType, playerName, limit });
     }
   }

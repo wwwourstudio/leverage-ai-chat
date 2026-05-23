@@ -305,7 +305,7 @@ export async function GET(req: NextRequest) {
         // isBenignRpcError: RPC not yet deployed or no permission — not a bug, just a missing migration.
         // Silence these so they don't pollute warning-level Vercel logs.
         const isBenignRpcError = (msg: string) =>
-          /does not exist|permission denied|42501|PGRST202|fetch failed|network/i.test(msg);
+          /does not exist|permission denied|42501|PGRST202|fetch failed|network|abort/i.test(msg);
 
         Promise.allSettled([
           supabase.rpc('cleanup_odds_snapshots', { retention_hours: 48 })

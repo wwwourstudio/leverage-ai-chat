@@ -98,9 +98,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    console.log(
-      `[v0] [cron/odds] Fetched ${oddsResult.length} games in ${Date.now() - startedAt}ms`,
-    );
+    if (oddsResult.length === 0) {
+      console.log('[cron/odds] Early exit reason: all sports returned 0 games (off-season or Odds API quota exhausted)');
+      return NextResponse.json({
+        success: true,
+        meta: {
+          gamesFetched: 0,
+          gamesCached: 0,
+          snapshotsInserted: 0,
+          closingLinesWritten: 0,
+          durationMs: Date.now() - startedAt,
+          runAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    console.log(`[cron/odds] Fetched ${oddsResult.length} games in ${Date.now() - startedAt}ms`);
 
     // ── Persist: upsert games → get UUIDs → upsert live_odds_cache ───────────
     // live_odds_cache.game_id_uuid is a NOT NULL FK to api.games(id).
@@ -278,7 +291,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (snapshotsInserted > 0) {
-          console.log(`[v0] [cron/odds] Inserted ${snapshotsInserted} odds snapshots, ${closingLinesWritten} closing lines`);
+          console.log(`[cron/odds] Inserted ${snapshotsInserted} odds snapshots, ${closingLinesWritten} closing lines`);
         }
 
         // Retention cleanup — keep odds_snapshots to 48h window, closing_lines to 90d.
@@ -289,23 +302,46 @@ export async function GET(req: NextRequest) {
         // out the next cron run will catch up.
         const cleanupCtrl = new AbortController();
         const cleanupTimeout = setTimeout(() => cleanupCtrl.abort(), 20_000);
+        // isBenignRpcError: RPC not yet deployed or no permission — not a bug, just a missing migration.
+        // Silence these so they don't pollute warning-level Vercel logs.
+        const isBenignRpcError = (msg: string) =>
+          /does not exist|permission denied|42501|PGRST202|fetch failed|network/i.test(msg);
+
         Promise.allSettled([
           supabase.rpc('cleanup_odds_snapshots', { retention_hours: 48 })
             .abortSignal(cleanupCtrl.signal)
             .then(({ data, error }) => {
-              if (error) console.warn('[v0] [cron/odds] Snapshot cleanup error:', error.message);
-              else if ((data as number) > 0) console.log(`[v0] [cron/odds] Cleaned ${data} old snapshots`);
-            }),
+              if (!error) {
+                if ((data as number) > 0) console.log(`[cron/odds] Cleaned ${data} old snapshots`);
+              } else {
+                const msg: string = (error as any).message ?? '';
+                if (!isBenignRpcError(msg)) console.error('[cron/odds] cleanup_odds_snapshots error:', msg);
+              }
+            })
+            .catch(() => { /* AbortError when cleanupCtrl fires — expected */ }),
           supabase.rpc('cleanup_closing_lines', { retention_days: 90 })
             .abortSignal(cleanupCtrl.signal)
             .then(({ error }) => {
-              if (error) console.warn('[v0] [cron/odds] Closing lines cleanup error:', error.message);
-            }),
+              if (error) {
+                const msg: string = (error as any).message ?? '';
+                if (!isBenignRpcError(msg)) console.error('[cron/odds] cleanup_closing_lines error:', msg);
+              }
+            })
+            .catch(() => { /* AbortError when cleanupCtrl fires — expected */ }),
         ]).finally(() => clearTimeout(cleanupTimeout));
       } catch (snapErr) {
         console.error('[v0] [cron/odds] Snapshot write exception:', snapErr);
       }
     }
+
+    const totalMarkets = oddsResult.reduce(
+      (sum: number, g: any) =>
+        sum + (Array.isArray(g.bookmakers) ? g.bookmakers.reduce((s: number, b: any) => s + (Array.isArray(b.markets) ? b.markets.length : 0), 0) : 0),
+      0,
+    );
+    console.log(
+      `[cron/odds] Complete: ${oddsResult.length} games, ${totalMarkets} markets, ${cached} cached, ${snapshotsInserted} snapshots — ${Date.now() - startedAt}ms`,
+    );
 
     return NextResponse.json({
       success: true,

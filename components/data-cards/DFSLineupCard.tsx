@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { ChevronRight, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PlayerDetailModal } from './PlayerDetailModal';
 
 export interface DFSProjection {
   player_name: string;
@@ -100,6 +102,7 @@ function RangeTrack({ p10, p50, p90, mean }: { p10: number; p50: number; p90: nu
 }
 
 export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DFSLineupCardProps) {
+  const [selectedPlayer, setSelectedPlayer] = useState<DFSProjection | null>(null);
   const total   = totalProjected ?? lineup.reduce((s, p) => s + (p.dk_pts_mean ?? 0), 0);
   const maxPts  = Math.max(...lineup.map(p => p.dk_pts_mean ?? 0), 1);
 
@@ -161,8 +164,13 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
           >
             {/* POS */}
             <span className="font-dm-mono text-[10px] text-[var(--text-muted)] min-w-[24px] shrink-0 uppercase">{p.player_type}</span>
-            {/* Name */}
-            <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--foreground)] truncate">{p.player_name}</span>
+            {/* Name — clickable to open player detail modal */}
+            <button
+              onClick={() => setSelectedPlayer(p)}
+              className="flex-1 min-w-0 text-left text-[13px] font-medium text-[var(--foreground)] hover:text-blue-300 truncate transition-colors cursor-pointer"
+            >
+              {p.player_name}
+            </button>
             {/* Team */}
             <span className="font-dm-mono text-[10px] text-[var(--text-secondary,var(--text-muted))] shrink-0">—</span>
             {/* Salary */}
@@ -211,6 +219,14 @@ export function DFSLineupCard({ lineup, totalProjected, site = 'DK', onAsk }: DF
             </button>
           )}
         </div>
+      )}
+      {selectedPlayer && (
+        <PlayerDetailModal
+          player={selectedPlayer}
+          site={site}
+          onClose={() => setSelectedPlayer(null)}
+          onAsk={onAsk}
+        />
       )}
     </article>
   );

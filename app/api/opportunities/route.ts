@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
 
       const cacheHeaders = { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' };
 
+      if (error) console.error('[API/opportunities] Supabase arbitrage error:', error.message);
       if (!error && stored && stored.length > 0) {
         const opportunities = stored.map((row: any) => ({
           event: `${row.away_team} @ ${row.home_team}`,
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
       .order('edge', { ascending: false })
       .limit(20);
 
+    if (edgeError) console.error('[API/opportunities] Supabase edge error:', edgeError.message);
     if (!edgeError && edgeData && edgeData.length > 0) {
       const opportunities = edgeData.map((row: any) => {
         const parts = (row.matchup ?? ' @ ').split(' @ ');

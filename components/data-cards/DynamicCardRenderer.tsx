@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Bookmark, FlaskConical, Share2, Check, Pin } from 'lucide-react';
+import { FlaskConical } from 'lucide-react';
 import type { CardData } from '@/lib/types';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
@@ -231,29 +231,6 @@ export function DynamicCardRenderer({
     });
   }, [bookmarkKey, cardId, safeCard]);
 
-  // Share card: copy formatted summary to clipboard with visual feedback
-  const [isShared, setIsShared] = useState(false);
-  const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shareCard = useCallback(() => {
-    const dataLines = Object.entries(safeCard.data)
-      .filter(([k, v]) => k !== 'realData' && k !== 'status' && v != null && v !== '')
-      .slice(0, 6)
-      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
-      .join('\n');
-    const text = [
-      `📊 ${safeCard.title}`,
-      `${safeCard.category} · ${safeCard.subcategory}`,
-      dataLines,
-      '',
-      'Shared from Leverage AI',
-    ].join('\n');
-    try {
-      navigator.clipboard.writeText(text);
-      setIsShared(true);
-      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
-      shareTimerRef.current = setTimeout(() => setIsShared(false), 2000);
-    } catch {}
-  }, [safeCard]);
 
   // Historical comparison: compare current data to the last snapshot for this card type+title.
   // Detects numeric field movements so we can show ↑/↓ "Updated" badges.
@@ -290,36 +267,12 @@ export function DynamicCardRenderer({
       <div className="relative group/card animate-card-enter" style={{ animationDelay: `${Math.min((index ?? 0) * 60, 300)}ms` }}>
         {el}
 
-        {/* Top-right: share + pin buttons — revealed on hover, always shown when pinned */}
-        <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
-          <div className={`flex items-center gap-1 transition-opacity duration-150 pointer-events-auto ${isBookmarked ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}>
-            <button
-              onClick={shareCard}
-              className="p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] hover:scale-110 active:scale-90"
-              aria-label="Copy card to clipboard"
-            >
-              {isShared
-                ? <Check className="w-3.5 h-3.5 text-blue-400" />
-                : <Share2 className="w-3.5 h-3.5 text-[var(--text-faint)]" />
-              }
-            </button>
-            {!skipBookmark && (
-              <button
-                onClick={toggleBookmark}
-                className={`p-1 rounded-md transition-all duration-150 hover:bg-[var(--bg-elevated)] hover:scale-110 active:scale-90 ${isBookmarked ? 'bg-blue-500/10' : ''}`}
-                aria-label={isBookmarked ? 'Unpin card' : 'Pin card'}
-              >
-                <Pin className={`w-3.5 h-3.5 transition-colors ${isBookmarked ? 'fill-blue-500 text-blue-500' : 'text-[var(--text-faint)]'}`} />
-              </button>
-            )}
-          </div>
-          {isEstimated && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
-              <FlaskConical className="w-3 h-3" aria-hidden="true" />
-              Estimated
-            </span>
-          )}
-        </div>
+        {isEstimated && (
+          <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
+            <FlaskConical className="w-3 h-3" aria-hidden="true" />
+            Estimated
+          </span>
+        )}
 
         {/* Bottom-right: data age label */}
         {dataAgeLabel && !isEstimated && (

@@ -1277,6 +1277,40 @@ export async function fetchMarketTrades(
 }
 
 /**
+ * Fetch price history for a single market (yes_price over time).
+ * Used by KalshiDetailModal to render the multi-series probability chart.
+ */
+export async function fetchMarketHistory(
+  ticker: string,
+  limit = 100,
+): Promise<Array<{ ts: number; pct: number }>> {
+  try {
+    const url = `${KALSHI_TRADING_URL}/markets/${encodeURIComponent(ticker)}/history?limit=${limit}`;
+    const response = await fetch(url, {
+      headers: buildHeaders(url),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const entries: any[] = data.history ?? data.market_history ?? [];
+    return entries.map((h: any) => {
+      const rawPrice = h.yes_price ?? h.yes_price_dollars ?? h.price ?? '0.5';
+      const pct = typeof rawPrice === 'string'
+        ? Math.round(parseFloat(rawPrice) * 100)
+        : Math.round(rawPrice > 1 ? rawPrice : rawPrice * 100);
+      const ts = h.ts
+        ? new Date(h.ts).getTime()
+        : h.created_time
+        ? new Date(h.created_time).getTime()
+        : Date.now();
+      return { ts, pct: Math.min(99, Math.max(1, pct)) };
+    }).filter(h => h.pct > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Fetch Kalshi events (grouped market containers).
  * Events wrap multiple binary markets (e.g. "2026 Midterms" → many district markets).
  */

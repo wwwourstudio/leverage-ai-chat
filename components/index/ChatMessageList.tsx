@@ -1,7 +1,7 @@
 'use client';
 
-import type { RefObject } from 'react';
-import { TrendingUp, CheckCheck, AlertCircle, Info, RotateCcw, Sparkles, CheckCircle } from 'lucide-react';
+import { useRef, useState, useCallback, useEffect, type RefObject } from 'react';
+import { TrendingUp, CheckCheck, AlertCircle, Info, RotateCcw, Sparkles, CheckCircle, ChevronDown } from 'lucide-react';
 import { CardLayout } from '@/components/data-cards/CardLayout';
 import { DatabaseStatusBanner } from '@/components/database-status-banner';
 import { AIProgressIndicator } from '@/components/ai-progress-indicator';
@@ -49,217 +49,324 @@ export function ChatMessageList({
   const { selectedCategory, kalshiBettingBannerVisible, setKalshiBettingBannerVisible } = useAppStore();
   const { speakingMessageId, setSpeakingMessageId } = useUserStore();
 
+  // ── Scroll management ──────────────────────────────────────────────────────
+  const containerRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isAtBottomRef = useRef(true);
+  const [showJumpBtn, setShowJumpBtn] = useState(false);
+  const [activeNavIdx, setActiveNavIdx] = useState(-1);
+
+  // Scroll to bottom on initial mount
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
+  // Auto-scroll to newest message when messages change or streaming starts
+  useEffect(() => {
+    if (!isAtBottomRef.current) {
+      // User scrolled up — show jump button but don't force-scroll
+      setShowJumpBtn(true);
+      return;
+    }
+    const el = containerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, isTyping]);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distFromBottom < 80;
+    isAtBottomRef.current = atBottom;
+    setShowJumpBtn(!atBottom && distFromBottom > 200);
+
+    // Determine which assistant response is currently in view for the nav indicator
+    const scrollMid = el.scrollTop + el.clientHeight * 0.35;
+    let closestIdx = 0;
+    let closestDist = Infinity;
+    messageRefs.current.forEach((ref, i) => {
+      if (!ref) return;
+      const dist = Math.abs(ref.offsetTop - scrollMid);
+      if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+    });
+    setActiveNavIdx(closestIdx);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = containerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    isAtBottomRef.current = true;
+    setShowJumpBtn(false);
+  }, []);
+
+  const jumpToMessage = useCallback((msgIdx: number) => {
+    const el = messageRefs.current[msgIdx];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  // Build nav items: one tick per non-welcome assistant response
+  const navItems = messages.reduce<{ msgIdx: number }[]>((acc, m, i) => {
+    if (m.role === 'assistant' && !(m as any).isWelcome) acc.push({ msgIdx: i });
+    return acc;
+  }, []);
+
   return (
-    <div
-      className="flex-1 min-h-0 overflow-y-auto px-4 py-6 custom-scrollbar scroll-smooth"
-      aria-live="polite"
-      aria-label="Conversation"
-      role="log"
-      style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}
-    >
-      <div className="max-w-5xl xl:max-w-6xl mx-auto space-y-6">
-        <DatabaseStatusBanner />
-        <KalshiBettingBanner visible={kalshiBettingBannerVisible} onDismiss={() => setKalshiBettingBannerVisible(false)} />
+    <div className="flex-1 min-h-0 relative flex">
+      {/* ── Main scroll container ── */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-6 custom-scrollbar"
+        aria-live="polite"
+        aria-label="Conversation"
+        role="log"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="max-w-5xl xl:max-w-6xl mx-auto space-y-6">
+          <DatabaseStatusBanner />
+          <KalshiBettingBanner visible={kalshiBettingBannerVisible} onDismiss={() => setKalshiBettingBannerVisible(false)} />
 
-        {messages.length === 0 ? (
-          <WelcomeScreen onPromptSelect={(q) => onGenerateResponse(q)} />
-        ) : (
-          messages.map((message: any, index: any) => {
-            const prevMessage = index > 0 ? messages[index - 1] : null;
-            const isGrouped = prevMessage && prevMessage.role === message.role;
+          {messages.length === 0 ? (
+            <WelcomeScreen onPromptSelect={(q) => onGenerateResponse(q)} />
+          ) : (
+            messages.map((message: any, index: any) => {
+              const prevMessage = index > 0 ? messages[index - 1] : null;
+              const isGrouped = prevMessage && prevMessage.role === message.role;
 
-            return (
-              <div
-                key={message.id ?? `msg-${index}`}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
-              >
-                <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
-                      <div className="relative w-7 h-7 shrink-0" role="img" aria-label="Leverage AI">
-                        <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
-                        <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
-                          <TrendingUp className="w-3.5 h-3.5 text-white" aria-hidden="true" />
+              return (
+                <div
+                  key={message.id ?? `msg-${index}`}
+                  ref={el => { messageRefs.current[index] = el; }}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn ${isGrouped ? 'mt-1.5' : 'mt-5'}`}
+                >
+                  <div className={message.role === 'user' ? 'max-w-[85%] md:max-w-[75%]' : 'w-full max-w-4xl lg:max-w-3xl'}>
+                    {message.role === 'assistant' && (
+                      <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
+                        <div className="relative w-7 h-7 shrink-0" role="img" aria-label="Leverage AI">
+                          <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 opacity-20 blur-sm" />
+                          <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+                            <TrendingUp className="w-3.5 h-3.5 text-white" aria-hidden="true" />
+                          </div>
                         </div>
+                        <span className="text-xs font-black tracking-tight text-[var(--foreground)]">Leverage<span className="text-blue-500 dark:text-blue-400"> AI</span></span>
+                        {message.sources && message.sources.length > 0 && !message.isWelcome && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                            <CheckCheck className="w-2.5 h-2.5 text-blue-400" />
+                            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live Data</span>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs font-black tracking-tight text-[var(--foreground)]">Leverage<span className="text-blue-500 dark:text-blue-400"> AI</span></span>
-                      {message.sources && message.sources.length > 0 && !message.isWelcome && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                          <CheckCheck className="w-2.5 h-2.5 text-blue-400" />
-                          <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live Data</span>
+                    )}
+
+                    <div
+                      className={`relative group/message ${
+                        message.role === 'user'
+                          ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
+                          : message.isError
+                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-foreground border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
+                            : message.isPartial
+                              ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
+                              : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] shadow-lg shadow-black/30'
+                      }`}
+                    >
+                      {editingMessageIndex === index ? (
+                        <div className="space-y-3">
+                          <textarea
+                            ref={editTextareaRef}
+                            value={editingContent}
+                            onChange={(e: any) => {
+                              onEditContentChange(e.target.value);
+                              adjustEditTextareaHeight();
+                            }}
+                            onKeyDown={onKeyDown}
+                            placeholder={
+                              selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." :
+                              selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
+                              selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
+                              selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
+                              "e.g. 'Weather-correlated Kalshi markets'"
+                            }
+                            className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
+                            rows={1}
+                            disabled={isTyping}
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => onSaveEdit(index)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Save & Regenerate
+                            </button>
+                            <button
+                              onClick={onCancelEdit}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--foreground)] rounded-lg text-xs font-bold transition-all border border-[var(--border-subtle)]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          {message.role === 'assistant' && message.isPending && (
+                            <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
+                              <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
+                              <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
+                              <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
+                            </div>
+                          )}
+                          {message.role === 'assistant' && message.isError && (
+                            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
+                              <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                              <span className="text-xs text-red-400 font-medium">Response failed</span>
+                            </div>
+                          )}
+                          {message.role === 'assistant' && message.isPartial && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="text-xs text-amber-400">Partial response</span>
+                            </div>
+                          )}
+                          {!message.isPending && (message.content.includes('__DETAILED_ANALYSIS__') ? (
+                            (() => {
+                              const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
+                              if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
+                              let analysisData: DetailedAnalysisData;
+                              try {
+                                analysisData = JSON.parse(match[1]);
+                              } catch {
+                                return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
+                              }
+                              return (
+                                <DetailedAnalysisLayout
+                                  data={analysisData}
+                                  isTyping={isTyping}
+                                  onFollowUp={onFollowUp}
+                                />
+                              );
+                            })()
+                          ) : (
+                            <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
+                              <MessageContent content={message.content} />
+                            </div>
+                          ))}
+
+                          <MessageAttachments attachments={message.attachments} />
+
+                          {message.editHistory && message.editHistory.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                              <details className="text-xs text-[var(--text-faint)]">
+                                <summary className="cursor-pointer hover:text-[var(--text-muted)] flex items-center gap-1.5">
+                                  <RotateCcw className="w-3 h-3" />
+                                  Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
+                                </summary>
+                              </details>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                  )}
 
-                  <div
-                    className={`relative group/message ${
-                      message.role === 'user'
-                        ? 'rounded-2xl rounded-tr-sm px-5 py-3.5 bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25 w-fit max-w-[85%] ml-auto'
-                        : message.isError
-                          ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-red-950/20 text-foreground border border-red-800/40 border-l-2 border-l-red-500/60 shadow-lg shadow-black/30'
-                          : message.isPartial
-                            ? 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] border-l-2 border-l-amber-500/60 shadow-lg shadow-black/30'
-                            : 'rounded-2xl rounded-tl-sm px-5 py-4 bg-gradient-to-br from-[var(--bg-overlay)] via-[var(--bg-elevated)]/50 to-[var(--bg-overlay)] text-foreground border border-[var(--border-subtle)] shadow-lg shadow-black/30'
-                    }`}
-                  >
-                    {editingMessageIndex === index ? (
-                      <div className="space-y-3">
-                        <textarea
-                          ref={editTextareaRef}
-                          value={editingContent}
-                          onChange={(e: any) => {
-                            onEditContentChange(e.target.value);
-                            adjustEditTextareaHeight();
-                          }}
-                          onKeyDown={onKeyDown}
-                          placeholder={
-                            selectedCategory === 'all' ? "Ask about sports betting, fantasy, DFS, or prediction markets..." :
-                            selectedCategory === 'betting' ? "e.g. 'Best value plays for tonight's games'" :
-                            selectedCategory === 'fantasy' ? "e.g. 'NFBC draft strategy for pick 3'" :
-                            selectedCategory === 'dfs' ? "e.g. 'Optimal GPP stack for tonight'" :
-                            "e.g. 'Weather-correlated Kalshi markets'"
-                          }
-                          className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-[13px] leading-relaxed resize-none min-h-[44px] max-h-[200px] pr-2"
-                          rows={1}
-                          disabled={isTyping}
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onSaveEdit(index)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Save & Regenerate
-                          </button>
-                          <button
-                            onClick={onCancelEdit}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-[var(--foreground)] rounded-lg text-xs font-bold transition-all border border-[var(--border-subtle)]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {message.role === 'assistant' && message.isPending && (
-                          <div className="space-y-2.5 py-1" aria-label="Loading response" aria-busy="true">
-                            <div className="h-2.5 w-48 rounded-full bg-white/10 animate-pulse" />
-                            <div className="h-2.5 w-64 rounded-full bg-white/10 animate-pulse [animation-delay:150ms]" />
-                            <div className="h-2.5 w-36 rounded-full bg-white/10 animate-pulse [animation-delay:300ms]" />
-                          </div>
-                        )}
-                        {message.role === 'assistant' && message.isError && (
-                          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-800/30">
-                            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                            <span className="text-xs text-red-400 font-medium">Response failed</span>
-                          </div>
-                        )}
-                        {message.role === 'assistant' && message.isPartial && (
-                          <div className="flex items-center gap-2 mb-2">
-                            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="text-xs text-amber-400">Partial response</span>
-                          </div>
-                        )}
-                        {!message.isPending && (message.content.includes('__DETAILED_ANALYSIS__') ? (
-                          (() => {
-                            const match = message.content.match(/__DETAILED_ANALYSIS__([\s\S]+)__END_ANALYSIS__/);
-                            if (!match) return <p className="text-sm leading-relaxed font-medium">{message.content}</p>;
-                            let analysisData: DetailedAnalysisData;
-                            try {
-                              analysisData = JSON.parse(match[1]);
-                            } catch {
-                              return <p className="text-sm leading-relaxed font-medium">{message.content.replace(/__DETAILED_ANALYSIS__[\s\S]*?__END_ANALYSIS__/, '').trim()}</p>;
-                            }
-                            return (
-                              <DetailedAnalysisLayout
-                                data={analysisData}
-                                isTyping={isTyping}
-                                onFollowUp={onFollowUp}
-                              />
-                            );
-                          })()
-                        ) : (
-                          <div className={(!message.isPending && message.isStreaming) ? 'content-streaming' : undefined}>
-                            <MessageContent content={message.content} />
-                          </div>
-                        ))}
-
-                        <MessageAttachments attachments={message.attachments} />
-
-                        {message.editHistory && message.editHistory.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                            <details className="text-xs text-[var(--text-faint)]">
-                              <summary className="cursor-pointer hover:text-[var(--text-muted)] flex items-center gap-1.5">
-                                <RotateCcw className="w-3 h-3" />
-                                Edited {message.editHistory.length} time{message.editHistory.length !== 1 ? 's' : ''}
-                              </summary>
-                            </details>
-                          </div>
-                        )}
-                      </>
+                    {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
+                      <CardLayout
+                        cards={message.cards}
+                        aiInsight={message.content}
+                        messageIndex={index}
+                        trustScore={message.trustMetrics?.finalConfidence}
+                        trustLevel={message.trustMetrics?.trustLevel}
+                        onAsk={(q: string) => onGenerateResponse(q)}
+                      />
                     )}
-                  </div>
 
-                  {message.role === 'assistant' && message.cards && message.cards.length > 0 && (
-                    <CardLayout
-                      cards={message.cards}
-                      aiInsight={message.content}
-                      messageIndex={index}
-                      trustScore={message.trustMetrics?.finalConfidence}
-                      trustLevel={message.trustMetrics?.trustLevel}
-                      onAsk={(q: string) => onGenerateResponse(q)}
+                    <SourcesPanel
+                      role={message.role}
+                      isWelcome={message.isWelcome}
+                      sources={message.sources}
+                      trustMetrics={message.trustMetrics}
+                      modelUsed={message.modelUsed}
+                      processingTime={message.processingTime}
                     />
-                  )}
 
-                  <SourcesPanel
-                    role={message.role}
-                    isWelcome={message.isWelcome}
-                    sources={message.sources}
-                    trustMetrics={message.trustMetrics}
-                    modelUsed={message.modelUsed}
-                    processingTime={message.processingTime}
-                  />
+                    <MessageActionsToolbar
+                      message={message}
+                      index={index}
+                      editingMessageIndex={editingMessageIndex}
+                      speakingMessageId={speakingMessageId}
+                      onEdit={onEditMessage}
+                      onVote={onVote}
+                      onRegenerate={onRegenerateResponse}
+                      onSpeak={(id, msgContent) => {
+                        const cards = (message as any).cards;
+                        const text = msgContent + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
+                        const voice_id = typeof window !== 'undefined'
+                          ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
+                          : GROK_VOICE_DEFAULT;
+                        setSpeakingMessageId(id);
+                        speakText(text, { voice_id, onEnd: () => setSpeakingMessageId(null) });
+                      }}
+                      onStopSpeak={() => { stopVoice(); setSpeakingMessageId(null); }}
+                      onCopy={onCopyMessage}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
 
-                  <MessageActionsToolbar
-                    message={message}
-                    index={index}
-                    editingMessageIndex={editingMessageIndex}
-                    speakingMessageId={speakingMessageId}
-                    onEdit={onEditMessage}
-                    onVote={onVote}
-                    onRegenerate={onRegenerateResponse}
-                    onSpeak={(id, msgContent) => {
-                      const cards = (message as any).cards;
-                      const text = msgContent + (cards?.length ? '\n\n' + cardsToSpeech(cards) : '');
-                      const voice_id = typeof window !== 'undefined'
-                        ? (localStorage.getItem(GROK_VOICE_STORAGE_KEY) ?? GROK_VOICE_DEFAULT)
-                        : GROK_VOICE_DEFAULT;
-                      setSpeakingMessageId(id);
-                      speakText(text, { voice_id, onEnd: () => setSpeakingMessageId(null) });
-                    }}
-                    onStopSpeak={() => { stopVoice(); setSpeakingMessageId(null); }}
-                    onCopy={onCopyMessage}
-                  />
+          {isTyping && !messages.some((m: Message) => m.isPending || m.isStreaming) && (
+            <div className="flex gap-3 animate-fade-in">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 space-y-3">
+                <div className="bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl px-5 py-4 border border-[var(--border-subtle)] shadow-2xl">
+                  <AIProgressIndicator stage={verifyStage} />
                 </div>
               </div>
-            );
-          })
-        )}
-
-        {isTyping && !messages.some((m: Message) => m.isPending || m.isStreaming) && (
-          <div className="flex gap-3 animate-fade-in">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/50 animate-pulse">
-              <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 space-y-3">
-              <div className="bg-gradient-to-br from-[var(--bg-overlay)] to-[var(--bg-overlay)] backdrop-blur-xl rounded-2xl px-5 py-4 border border-[var(--border-subtle)] shadow-2xl">
-                <AIProgressIndicator stage={verifyStage} />
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* ── Grok-style message navigation ── */}
+      {navItems.length > 1 && (
+        <div className="w-5 shrink-0 flex flex-col items-center py-8 relative select-none" aria-hidden="true">
+          {/* Track */}
+          <div className="absolute top-8 bottom-8 left-1/2 -translate-x-1/2 w-px bg-white/8" />
+          {navItems.map(({ msgIdx }, tickIdx) => {
+            const pct = navItems.length === 1 ? 50 : (tickIdx / (navItems.length - 1)) * 100;
+            const isActive = activeNavIdx >= msgIdx && (
+              tickIdx === navItems.length - 1 || activeNavIdx < navItems[tickIdx + 1].msgIdx
+            );
+            return (
+              <button
+                key={msgIdx}
+                onClick={() => jumpToMessage(msgIdx)}
+                title={`Response ${tickIdx + 1}`}
+                style={{ top: `${pct}%` }}
+                className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-150 rounded-full cursor-pointer ${
+                  isActive
+                    ? 'w-3.5 h-[3px] bg-blue-400 shadow-[0_0_4px_rgba(96,165,250,0.6)]'
+                    : 'w-2.5 h-[2px] bg-white/20 hover:bg-white/45 hover:w-3'
+                }`}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Jump-to-latest button ── */}
+      {showJumpBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-6 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600/90 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/30 backdrop-blur-sm border border-blue-400/20 transition-all animate-fade-in"
+          aria-label="Jump to latest message"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+          Latest
+        </button>
+      )}
     </div>
   );
 }

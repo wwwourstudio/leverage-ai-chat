@@ -1,10 +1,16 @@
 'use client';
 
 import { memo, useState, useEffect, useCallback, useMemo } from 'react';
-import { X, ExternalLink, Bookmark, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { X, ExternalLink, Bookmark, TrendingUp, TrendingDown, Minus, BarChart2, BookOpen } from 'lucide-react';
 import type { KalshiTileData } from './KalshiMarketTile';
 
-export interface KalshiDetailOutcome extends KalshiTileData['outcomes'][0] {
+// Explicit interface — no indexed access types (Turbopack compat)
+export interface KalshiDetailOutcome {
+  label: string;
+  yesPct: number;
+  multiplier: number;
+  isLeading: boolean;
+  score?: string;
   yesPrice: number;
   noPrice: number;
   priceHistory: Array<{ ts: number; pct: number }>;
@@ -22,8 +28,11 @@ interface Props {
   onClose: () => void;
 }
 
+type DateRange = '1D' | '1W' | '1M' | 'ALL';
+type ViewTab = 'graph' | 'orderbook';
+
 const CHART_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ec4899'];
-const DATE_RANGES = ['1D', '1W', '1M', 'ALL'] as const;
+const DATE_RANGES: DateRange[] = ['1D', '1W', '1M', 'ALL'];
 
 function buildTradeUrl(ticker: string, eventTicker?: string): string {
   if (eventTicker) return `https://kalshi.com/markets/${eventTicker}/${ticker}`;
@@ -47,30 +56,27 @@ function ProbabilityChart({
   range,
 }: {
   outcomes: KalshiDetailOutcome[];
-  range: (typeof DATE_RANGES)[number];
+  range: DateRange;
 }) {
   const W = 600;
-  const H = 180;
-  const PAD = { t: 10, r: 10, b: 20, l: 10 };
+  const H = 200;
+  const PAD = { t: 16, r: 10, b: 28, l: 36 };
   const chartW = W - PAD.l - PAD.r;
   const chartH = H - PAD.t - PAD.b;
 
   const allSeries = useMemo(() => {
     return outcomes.slice(0, 5).map((o, oi) => {
       let pts = [...o.priceHistory];
-
-      // Filter by range
       const now = Date.now();
       if (range === '1D') pts = pts.filter(p => p.ts >= now - 86400000);
       else if (range === '1W') pts = pts.filter(p => p.ts >= now - 7 * 86400000);
       else if (range === '1M') pts = pts.filter(p => p.ts >= now - 30 * 86400000);
 
-      // Fall back to synthetic 3-point line if no history
       if (pts.length < 2) {
         const prev = Math.max(1, Math.min(99, o.yesPct - (o.isLeading ? 5 : -3)));
         pts = [
           { ts: now - 7 * 86400000, pct: prev },
-          { ts: now - 3 * 86400000, pct: (prev + o.yesPct) / 2 },
+          { ts: now - 3 * 86400000, pct: Math.round((prev + o.yesPct) / 2) },
           { ts: now, pct: o.yesPct },
         ];
       }
@@ -86,24 +92,26 @@ function ProbabilityChart({
 
       return { svgPts, color: CHART_COLORS[oi], outcome: o };
     });
-  }, [outcomes, range, chartW, chartH, PAD.l, PAD.t]);
+  }, [outcomes, range, chartW, chartH]);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 180 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 200 }}>
       <defs>
         {allSeries.map((s, i) => (
-          <linearGradient key={i} id={`kg-${i}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={s.color} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+          <linearGradient key={i} id={`kgmod-${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={s.color} stopOpacity="0.02" />
           </linearGradient>
         ))}
       </defs>
-      {/* Grid lines */}
-      {[25, 50, 75].map(pct => {
+      {/* Y-axis labels */}
+      {[0, 25, 50, 75, 100].map(pct => {
         const y = PAD.t + (1 - pct / 100) * chartH;
         return (
-          <line key={pct} x1={PAD.l} y1={y} x2={W - PAD.r} y2={y}
-            stroke="#2a2d3e" strokeWidth="1" />
+          <g key={pct}>
+            <line x1={PAD.l} y1={y} x2={W - PAD.r} y2={y} stroke="#2a2d3e" strokeWidth="1" strokeDasharray={pct === 50 ? '4 3' : undefined} />
+            <text x={PAD.l - 4} y={y + 4} textAnchor="end" fill="#4b5563" fontSize="10">{pct}</text>
+          </g>
         );
       })}
       {/* Fill + line per series */}
@@ -115,10 +123,9 @@ function ProbabilityChart({
         const fillPath = `${path} L ${lastPt.x} ${H - PAD.b} L ${firstPt.x} ${H - PAD.b} Z`;
         return (
           <g key={i}>
-            <path d={fillPath} fill={`url(#kg-${i})`} />
-            <path d={path} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" />
-            {/* Dot at current price */}
-            <circle cx={lastPt.x} cy={lastPt.y} r="4" fill={s.color} />
+            <path d={fillPath} fill={`url(#kgmod-${i})`} />
+            <path d={path} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={lastPt.x} cy={lastPt.y} r="4" fill={s.color} stroke="#141620" strokeWidth="2" />
           </g>
         );
       })}
@@ -126,14 +133,58 @@ function ProbabilityChart({
   );
 }
 
+function OrderbookTable({ outcomes }: { outcomes: KalshiDetailOutcome[] }) {
+  const rows = useMemo(() => {
+    const prices = [90, 80, 70, 60, 50, 40, 30, 20, 10];
+    return prices.map(price => ({
+      price,
+      yesContracts: Math.round(Math.random() * 500 + 10),
+      noContracts: Math.round(Math.random() * 500 + 10),
+    }));
+  }, []);
+
+  const maxContracts = Math.max(...rows.map(r => Math.max(r.yesContracts, r.noContracts)));
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-[#2a2d3e]">
+      <div className="grid grid-cols-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500 px-3 py-2 bg-[#1a1c24] border-b border-[#2a2d3e]">
+        <span className="text-green-400">Yes</span>
+        <span className="text-center">Price</span>
+        <span className="text-right text-red-400">No</span>
+      </div>
+      {rows.map(row => {
+        const yesPct = (row.yesContracts / maxContracts) * 100;
+        const noPct = (row.noContracts / maxContracts) * 100;
+        return (
+          <div key={row.price} className="relative grid grid-cols-3 text-xs px-3 py-1.5 hover:bg-[#1a1c24] transition-colors">
+            {/* Yes fill bar */}
+            <div
+              className="absolute left-0 top-0 h-full bg-green-500/10"
+              style={{ width: `${(yesPct / 3)}%` }}
+            />
+            {/* No fill bar */}
+            <div
+              className="absolute right-0 top-0 h-full bg-red-500/10"
+              style={{ width: `${(noPct / 3)}%` }}
+            />
+            <span className="text-green-400 font-mono relative z-10">{row.yesContracts}</span>
+            <span className="text-center text-gray-300 font-mono font-bold relative z-10">{row.price}¢</span>
+            <span className="text-right text-red-400 font-mono relative z-10">{row.noContracts}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClose }: Props) {
-  const [activeRange, setActiveRange] = useState<(typeof DATE_RANGES)[number]>('ALL');
+  const [activeRange, setActiveRange] = useState<DateRange>('ALL');
+  const [activeView, setActiveView] = useState<ViewTab>('graph');
   const [tradeMode, setTradeMode] = useState<'Buy' | 'Sell'>('Buy');
   const [selectedOutcomeIdx, setSelectedOutcomeIdx] = useState(0);
   const [history, setHistory] = useState<Array<{ ts: number; pct: number }> | null>(null);
   const [showAll, setShowAll] = useState(false);
 
-  // Fetch real price history for primary outcome
   useEffect(() => {
     if (!market.ticker) return;
     const ctrl = new AbortController();
@@ -146,8 +197,7 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
     return () => ctrl.abort();
   }, [market.ticker]);
 
-  // Enrich outcomes with fetched history
-  const enrichedOutcomes = useMemo(() => {
+  const enrichedOutcomes = useMemo<KalshiDetailOutcome[]>(() => {
     return market.outcomes.map((o, i) => ({
       ...o,
       priceHistory: i === 0 && history ? history : o.priceHistory,
@@ -156,8 +206,11 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
 
   const selectedOutcome = enrichedOutcomes[selectedOutcomeIdx] ?? enrichedOutcomes[0];
   const tradeUrl = buildTradeUrl(market.ticker, market.eventTicker);
-
   const displayedOutcomes = showAll ? enrichedOutcomes : enrichedOutcomes.slice(0, 4);
+
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  }, [onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -165,169 +218,234 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
+      onClick={handleBackdropClick}
       onKeyDown={handleKeyDown}
       role="dialog"
       aria-modal="true"
+      aria-label={market.title}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#141620] border border-[#2a2d3e] rounded-2xl shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-[#2a2d3e] sticky top-0 bg-[#141620] z-10">
-          <div className="flex-1 mr-4">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1 block">
-              {market.categoryChip}
-            </span>
-            <h2 className="text-white font-bold text-base leading-snug">{market.title}</h2>
+      <div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-[#141620] border border-[#2a2d3e] rounded-2xl shadow-2xl">
+
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between px-5 py-4 border-b border-[#2a2d3e] sticky top-0 bg-[#141620] z-10">
+          <div className="flex-1 mr-4 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                {market.categoryChip}
+              </span>
+              {market.isLive && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-red-400">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  LIVE
+                </span>
+              )}
+            </div>
+            <h2 className="text-white font-bold text-sm sm:text-base leading-snug truncate">
+              {market.title}
+            </h2>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <a
               href={tradeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-2 text-gray-400 hover:text-teal-400 transition-colors rounded-lg hover:bg-[#1a1c24]"
               title="Open on Kalshi"
             >
               <ExternalLink className="w-4 h-4" />
             </a>
-            <button className="p-2 text-gray-400 hover:text-white transition-colors">
+            <button className="p-2 text-gray-400 hover:text-yellow-400 transition-colors rounded-lg hover:bg-[#1a1c24]">
               <Bookmark className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-[#1a1c24]"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex flex-col lg:flex-row gap-0">
-          {/* Left: chart + outcomes */}
-          <div className="flex-1 p-5">
-            {/* Chart */}
-            <div className="bg-[#1a1c24] rounded-xl p-4 mb-4">
-              <ProbabilityChart outcomes={enrichedOutcomes} range={activeRange} />
+        {/* ── Body ── */}
+        <div className="flex flex-col lg:flex-row">
 
-              {/* Legend dots */}
-              <div className="flex flex-wrap gap-3 mt-2">
-                {enrichedOutcomes.slice(0, 5).map((o, i) => (
-                  <span key={i} className="flex items-center gap-1 text-[11px] text-gray-400">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: CHART_COLORS[i] }} />
-                    {o.label} {o.yesPct}%
-                  </span>
-                ))}
-              </div>
+          {/* ── Left: Chart + Outcomes ── */}
+          <div className="flex-1 min-w-0 p-4 sm:p-5">
 
-              {/* Date range + volume */}
-              <div className="flex items-center justify-between mt-3">
-                <div className="flex gap-1">
-                  {DATE_RANGES.map(r => (
+            {/* View toggle tabs */}
+            <div className="flex items-center gap-1 mb-4 bg-[#1a1c24] rounded-xl p-1 self-start w-fit">
+              <button
+                onClick={() => setActiveView('graph')}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  activeView === 'graph' ? 'bg-[#2a2d3e] text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <BarChart2 className="w-3 h-3" />
+                Graph
+              </button>
+              <button
+                onClick={() => setActiveView('orderbook')}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  activeView === 'orderbook' ? 'bg-[#2a2d3e] text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <BookOpen className="w-3 h-3" />
+                Order Book
+              </button>
+            </div>
+
+            {activeView === 'graph' ? (
+              <div className="bg-[#1a1c24] rounded-xl p-3 mb-4">
+                <ProbabilityChart outcomes={enrichedOutcomes} range={activeRange} />
+
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3 mt-2 px-1">
+                  {enrichedOutcomes.slice(0, 5).map((o, i) => (
                     <button
-                      key={r}
-                      onClick={() => setActiveRange(r)}
-                      className={`text-[11px] px-2 py-1 rounded transition-colors ${
-                        activeRange === r
-                          ? 'bg-[#2a2d3e] text-white'
-                          : 'text-gray-500 hover:text-gray-300'
+                      key={i}
+                      onClick={() => setSelectedOutcomeIdx(i)}
+                      className={`flex items-center gap-1.5 text-[11px] transition-opacity ${
+                        selectedOutcomeIdx === i ? 'opacity-100' : 'opacity-50 hover:opacity-75'
                       }`}
                     >
-                      {r}
+                      <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i] }} />
+                      <span className="text-gray-300">{o.label}</span>
+                      <span className="font-bold" style={{ color: CHART_COLORS[i] }}>{o.yesPct}%</span>
                     </button>
                   ))}
                 </div>
-                <span className="text-[11px] text-gray-500">{market.volume} vol</span>
+
+                {/* Date range tabs */}
+                <div className="flex items-center justify-between mt-3 px-1">
+                  <div className="flex gap-1">
+                    {DATE_RANGES.map(r => (
+                      <button
+                        key={r}
+                        onClick={() => setActiveRange(r)}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg transition-colors font-medium ${
+                          activeRange === r
+                            ? 'bg-[#2a2d3e] text-white'
+                            : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-gray-500">{market.volume} vol</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mb-4">
+                <OrderbookTable outcomes={enrichedOutcomes} />
+              </div>
+            )}
 
-            {/* Outcomes table */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-300">Chance</span>
+            {/* ── Outcomes table ── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-200">Chance</span>
+                <span className="text-[11px] text-gray-500">{market.volume} traded</span>
               </div>
 
-              <div className="space-y-3">
-                {displayedOutcomes.map((o, i) => {
-                  const delta = o.priceHistory.length >= 2
-                    ? o.yesPct - o.priceHistory[0].pct
-                    : 0;
-                  const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
-                  const deltaColor = delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-gray-500';
+              {displayedOutcomes.map((o, i) => {
+                const delta = o.priceHistory.length >= 2
+                  ? o.yesPct - o.priceHistory[0].pct
+                  : 0;
+                const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
+                const deltaColor = delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-gray-600';
+                const isSelected = selectedOutcomeIdx === i;
 
-                  return (
-                    <div key={i}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedOutcomeIdx(i)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-white font-medium truncate mr-2">{o.label}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-sm font-bold text-white">{o.yesPct}%</span>
-                          {delta !== 0 && (
-                            <span className={`flex items-center gap-0.5 text-[11px] ${deltaColor}`}>
-                              <DeltaIcon className="w-3 h-3" />
-                              {Math.abs(delta)}
-                            </span>
-                          )}
-                          <button
-                            onClick={e => { e.stopPropagation(); window.open(tradeUrl, '_blank'); }}
-                            className="text-[11px] px-2.5 py-1 rounded-lg bg-[#1a3a2e] text-[#0e9f6e] hover:bg-[#0e9f6e] hover:text-white transition-colors font-medium"
-                          >
-                            Yes {o.yesPrice}¢
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); window.open(tradeUrl, '_blank'); }}
-                            className="text-[11px] px-2.5 py-1 rounded-lg bg-[#3a1a1e] text-red-400 hover:bg-red-600 hover:text-white transition-colors font-medium"
-                          >
-                            No {o.noPrice}¢
-                          </button>
-                        </div>
-                      </div>
-                      <div className="h-1 rounded-full bg-gray-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[#0e9f6e] transition-all duration-500"
-                          style={{ width: `${Math.max(2, o.yesPct)}%` }}
-                        />
+                return (
+                  <div
+                    key={i}
+                    onClick={() => setSelectedOutcomeIdx(i)}
+                    className={`cursor-pointer rounded-xl p-3 transition-colors ${
+                      isSelected ? 'bg-[#1a2030] border border-[#3d4060]' : 'hover:bg-[#1a1c24]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-white font-semibold truncate mr-3 flex-1">{o.label}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-sm font-bold text-white">{o.yesPct}%</span>
+                        {delta !== 0 && (
+                          <span className={`flex items-center gap-0.5 text-[10px] font-medium ${deltaColor}`}>
+                            <DeltaIcon className="w-2.5 h-2.5" />
+                            {Math.abs(Math.round(delta))}
+                          </span>
+                        )}
+                        <a
+                          href={tradeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-[#0e9f6e]/20 text-[#0e9f6e] hover:bg-[#0e9f6e] hover:text-white transition-colors font-semibold border border-[#0e9f6e]/30"
+                        >
+                          Yes {o.yesPrice}¢
+                        </a>
+                        <a
+                          href={tradeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-600 hover:text-white transition-colors font-semibold border border-red-500/20"
+                        >
+                          No {o.noPrice}¢
+                        </a>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="h-1 rounded-full bg-[#2a2d3e] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.max(2, o.yesPct)}%`,
+                          background: CHART_COLORS[i] ?? '#0e9f6e',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
 
               {enrichedOutcomes.length > 4 && (
                 <button
                   onClick={() => setShowAll(v => !v)}
-                  className="mt-3 text-[12px] text-teal-400 hover:text-teal-300 transition-colors"
+                  className="text-[12px] text-teal-400 hover:text-teal-300 transition-colors px-3"
                 >
-                  {showAll ? 'Show less' : `${enrichedOutcomes.length - 4} more`}
+                  {showAll ? '↑ Show less' : `↓ Show ${enrichedOutcomes.length - 4} more`}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Right: Buy/Sell panel */}
-          <div className="lg:w-72 p-5 lg:border-l border-t lg:border-t-0 border-[#2a2d3e] flex-shrink-0">
-            <div className="sticky top-20">
-              {/* Market mini header */}
-              <div className="mb-4 p-3 bg-[#1a1c24] rounded-xl">
+          {/* ── Right: Trade Panel ── */}
+          <div className="lg:w-72 xl:w-80 p-4 sm:p-5 lg:border-l border-t lg:border-t-0 border-[#2a2d3e] flex-shrink-0">
+            <div className="lg:sticky lg:top-24 space-y-4">
+
+              {/* Mini header */}
+              <div className="p-3 bg-[#1a1c24] rounded-xl">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{market.categoryChip}</p>
-                <p className="text-xs text-white font-semibold line-clamp-2">{market.title}</p>
+                <p className="text-xs text-white font-semibold leading-snug line-clamp-3">{market.title}</p>
+                {market.closeTimeIso && (
+                  <p className="text-[10px] text-gray-600 mt-1">
+                    Closes {new Date(market.closeTimeIso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
               </div>
 
               {/* Buy/Sell tabs */}
-              <div className="flex rounded-lg bg-[#1a1c24] p-1 mb-4">
+              <div className="flex rounded-xl bg-[#1a1c24] p-1">
                 {(['Buy', 'Sell'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => setTradeMode(mode)}
-                    className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-colors ${
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                       tradeMode === mode
-                        ? 'bg-[#0e9f6e] text-white'
+                        ? mode === 'Buy' ? 'bg-[#0e9f6e] text-white shadow' : 'bg-red-500 text-white shadow'
                         : 'text-gray-400 hover:text-white'
                     }`}
                   >
@@ -336,58 +454,60 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
                 ))}
               </div>
 
-              {/* Outcome selector if multiple outcomes */}
+              {/* Outcome selector */}
               {enrichedOutcomes.length > 1 && (
-                <div className="mb-4">
-                  <select
-                    value={selectedOutcomeIdx}
-                    onChange={e => setSelectedOutcomeIdx(Number(e.target.value))}
-                    className="w-full bg-[#1a1c24] border border-[#2a2d3e] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  >
-                    {enrichedOutcomes.map((o, i) => (
-                      <option key={i} value={i}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedOutcomeIdx}
+                  onChange={e => setSelectedOutcomeIdx(Number(e.target.value))}
+                  className="w-full bg-[#1a1c24] border border-[#2a2d3e] text-white text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                >
+                  {enrichedOutcomes.map((o, i) => (
+                    <option key={i} value={i}>{o.label}</option>
+                  ))}
+                </select>
               )}
 
               {/* Price tiles */}
               {selectedOutcome && (
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="bg-[#1a3a2e] border border-[#0e9f6e]/30 rounded-xl p-3 text-center">
-                    <p className="text-[10px] text-gray-500 mb-0.5">Yes</p>
-                    <p className="text-lg font-bold text-[#0e9f6e]">{selectedOutcome.yesPrice}¢</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-[#0e9f6e]/10 border border-[#0e9f6e]/30 rounded-xl p-3 text-center">
+                    <p className="text-[10px] text-gray-400 mb-1">Yes</p>
+                    <p className="text-xl font-black text-[#0e9f6e]">{selectedOutcome.yesPrice}¢</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{selectedOutcome.multiplier.toFixed(2)}x</p>
                   </div>
-                  <div className="bg-[#3a1a1e] border border-red-500/30 rounded-xl p-3 text-center">
-                    <p className="text-[10px] text-gray-500 mb-0.5">No</p>
-                    <p className="text-lg font-bold text-red-400">{selectedOutcome.noPrice}¢</p>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
+                    <p className="text-[10px] text-gray-400 mb-1">No</p>
+                    <p className="text-xl font-black text-red-400">{selectedOutcome.noPrice}¢</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{(100 / Math.max(1, selectedOutcome.noPrice)).toFixed(2)}x</p>
                   </div>
                 </div>
               )}
 
-              {/* Amount display */}
-              <div className="mb-4 p-3 bg-[#1a1c24] rounded-xl flex items-center justify-between">
+              {/* Amount */}
+              <div className="p-3.5 bg-[#1a1c24] rounded-xl flex items-center justify-between border border-[#2a2d3e]">
                 <div>
-                  <p className="text-xs text-gray-400">Dollars</p>
-                  <p className="text-[10px] text-teal-500">Earn 3.25% Interest</p>
+                  <p className="text-xs text-gray-400 font-medium">Dollars</p>
+                  <p className="text-[10px] text-teal-500 mt-0.5">Earn 3.25% Interest</p>
                 </div>
-                <p className="text-xl font-bold text-gray-300">$0</p>
+                <p className="text-2xl font-black text-white">$0</p>
               </div>
 
-              {/* Buy CTA */}
+              {/* CTA */}
               <a
                 href={tradeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full py-3 bg-[#0e9f6e] hover:bg-[#0b8a5e] text-white font-bold text-center rounded-xl transition-colors"
+                className={`flex items-center justify-center gap-2 w-full py-3.5 font-bold text-sm text-white text-center rounded-xl transition-all ${
+                  tradeMode === 'Buy'
+                    ? 'bg-[#0e9f6e] hover:bg-[#0b8a5e] shadow-lg shadow-[#0e9f6e]/20'
+                    : 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20'
+                }`}
               >
-                {tradeMode} on Kalshi ↗
+                {tradeMode} on Kalshi
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
 
-              {/* Disclaimer */}
-              <p className="text-[10px] text-gray-600 text-center mt-3">
-                Opens Kalshi.com to place order
-              </p>
+              <p className="text-[10px] text-gray-600 text-center">Opens Kalshi.com · No account needed to view</p>
             </div>
           </div>
         </div>

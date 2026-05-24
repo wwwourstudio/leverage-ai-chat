@@ -74,6 +74,9 @@ function normalizeSingleMarket(d: Record<string, any>): KalshiTileData {
     liveStatus: d.expiresLabel,
     eventTicker: d.eventTicker,
     closeTimeIso: d.closeTimeIso,
+    subcategoryLabel: d.subcategoryLabel,
+    iconCode: d.iconCode,
+    iconType: d.iconType,
   };
 }
 

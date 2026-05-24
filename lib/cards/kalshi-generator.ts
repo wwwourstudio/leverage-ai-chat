@@ -49,11 +49,42 @@ function deriveChip(m: any): string {
   return (m.category || 'KALSHI').toUpperCase().slice(0, 12);
 }
 
+// Infer icon type and code from category/subcategory
+function deriveIconMeta(m: any, sub: string): { iconCode?: string; iconType?: 'city' | 'avatar' | 'flag' | 'team'; subcategoryLabel?: string } {
+  const cat = (m.category || '').toLowerCase();
+  const title = (m.title || '').toLowerCase();
+
+  if (sub === 'weather' || sub === 'climate' || cat.includes('weather') || cat.includes('climate') || cat.includes('temperature')) {
+    // Extract city abbreviation from title or series ticker
+    const cityMatch = (m.seriesTicker || m.title || '').match(/\b([A-Z]{2,4})\b/);
+    const code = cityMatch?.[1] ?? (m.seriesTicker?.slice(0, 3) ?? 'WX');
+    return { iconCode: code, iconType: 'city', subcategoryLabel: 'Climate' };
+  }
+  if (sub === 'politics' || sub === 'elections' || sub === 'election' ||
+      cat.includes('election') || cat.includes('politic') || title.includes('president') || title.includes('senate')) {
+    return { iconType: 'avatar', subcategoryLabel: 'Politics' };
+  }
+  if (sub === 'culture' || sub === 'entertainment' ||
+      cat.includes('entertainment') || cat.includes('music') || cat.includes('award')) {
+    return { iconType: 'avatar', subcategoryLabel: 'Culture' };
+  }
+  if (sub === 'sports' || sub === 'sport' || cat.includes('nfl') || cat.includes('nba') || cat.includes('mlb') || cat.includes('nhl')) {
+    const sportLabel =
+      cat.includes('mlb') || title.includes('mlb') || title.includes('baseball') ? 'Pro Baseball' :
+      cat.includes('nba') || title.includes('nba') || title.includes('basketball') ? 'Pro Basketball' :
+      cat.includes('nfl') || title.includes('nfl') || title.includes('football') ? 'Pro Football' :
+      cat.includes('nhl') || title.includes('nhl') || title.includes('hockey') ? 'Pro Hockey' : 'Sports';
+    return { iconType: 'team', subcategoryLabel: sportLabel };
+  }
+  return {};
+}
+
 /** Convert a KalshiMarket to KalshiTileData for use in the grid card. */
-function normalizeMarketForTile(m: any): KalshiTileData {
+function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
   const yesPct = Math.min(99, Math.max(1, Math.round(m.yesPrice ?? 50)));
   const noPct = Math.min(99, Math.max(1, Math.round(m.noPrice ?? (100 - yesPct))));
   const vol = fmtVol(m.volume24h > 0 ? m.volume24h : m.volume ?? 0);
+  const iconMeta = deriveIconMeta(m, sub);
   return {
     ticker: m.ticker ?? '',
     title: m.title ?? 'Market',
@@ -77,6 +108,7 @@ function normalizeMarketForTile(m: any): KalshiTileData {
     isLive: m.status === 'active' || m.status === 'open',
     eventTicker: m.eventTicker,
     closeTimeIso: m.closeTime || null,
+    ...iconMeta,
   };
 }
 
@@ -96,7 +128,7 @@ function kalshiMarketsToGroupedCard(
     subcategory: label,
     gradient: SUBCATEGORY_GRADIENTS[subcategory] ?? 'from-teal-600 to-cyan-700',
     data: {
-      markets: top.map(normalizeMarketForTile),
+      markets: top.map(m => normalizeMarketForTile(m, subcategory)),
       seriesTicker: top[0]?.seriesTicker ?? '',
     },
     status: 'active',

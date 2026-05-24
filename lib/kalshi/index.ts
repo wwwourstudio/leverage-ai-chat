@@ -1,18 +1,29 @@
 /**
- * Unified Kalshi Prediction Markets API Client
- * Consolidated from multiple Kalshi modules
+ * Kalshi Prediction Markets — Data Client
  *
- * Fetches real-time prediction market data from Kalshi API
- * API Documentation: https://trading-api.readme.io/reference/getting-started
+ * Fetches read-only market data from api.elections.kalshi.com/trade-api/v2.
+ * For authenticated trading (orders, portfolio) use lib/kalshi/kalshiClient.ts.
+ *
+ * Key design:
+ *  - One shared market pool per Lambda instance (fetched once, cached 60 s)
+ *  - All topic filtering (sports / politics / weather / finance / culture) is
+ *    client-side — the Kalshi v2 API silently ignores search/category params
+ *  - Politics uses direct series_ticker queries (that param IS supported)
+ *  - No fake fallback URL — there is only one Kalshi endpoint
  */
 
 import crypto from 'crypto';
 
-const _IS_DEMO = process.env.KALSHI_ENV === 'demo';
-const KALSHI_TRADING_URL = _IS_DEMO
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const BASE_URL = process.env.KALSHI_ENV === 'demo'
   ? 'https://demo-api.kalshi.co/trade-api/v2'
   : 'https://api.elections.kalshi.com/trade-api/v2';
-const KALSHI_FALLBACK_URL = KALSHI_TRADING_URL;
+
+const FETCH_TIMEOUT_MS  = 15_000;
+const POOL_CACHE_TTL_MS = 60_000;
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface KalshiMarket {
   ticker: string;
@@ -21,175 +32,123 @@ export interface KalshiMarket {
   subtitle: string;
   yesPrice: number;
   noPrice: number;
-  // Bid/ask order book data (0-100 cents)
   yesBid: number;
   yesAsk: number;
   noBid: number;
   noAsk: number;
-  spread: number;       // yesAsk - yesBid
-  lastPrice: number;    // last traded price
-  volume24h: number;    // 24-hour rolling volume
-  eventTicker: string;  // parent event ticker
-  seriesTicker: string; // series/league ticker
-  priceChange: number;  // change vs previous_yes_bid
+  spread: number;
+  lastPrice: number;
+  volume24h: number;
+  eventTicker: string;
+  seriesTicker: string;
+  priceChange: number;
   volume: number;
   openInterest: number;
   closeTime: string;
   status: string;
-  priceIsReal: boolean;  // true when lastPrice > 0 OR yesBid > 0 OR yesAsk > 0
+  priceIsReal: boolean;
 }
 
-interface KalshiPage {
-  markets: KalshiMarket[];
-  cursor: string | null;
+export interface KalshiVolatilityInput {
+  ticker: string;
+  title: string;
+  yesPrice: number;
+  noPrice: number;
+  volume24h?: number;
+  spread?: number;
+  priceChange?: number;
+  closeTime?: string;
 }
 
-// In-memory cache with TTL
-interface CacheEntry {
-  data: KalshiMarket[];
-  timestamp: number;
-  ttl: number;
+export interface KalshiAnalysis {
+  ticker: string;
+  title: string;
+  impliedProbability: number;
+  modelProbability: number;
+  edge: number;
+  signal: 'YES' | 'NO' | 'PASS';
+  confidence: number;
+  spreadPct: number;
+  isLiquid: boolean;
+  recommendation: string;
 }
 
-const marketCache = new Map<string, CacheEntry>();
+// ── Auth ──────────────────────────────────────────────────────────────────────
 
-// Tracks in-flight requests by cache key so concurrent callers share one HTTP request
-const pendingRequests = new Map<string, Promise<KalshiMarket[]>>();
-
-// Set to true inside doFetch's catch block so fetchKalshiMarketsWithRetry can
-// distinguish "API returned 0" (legitimate, don't retry) from "API errored and
-// returned []" (worth retrying).  Reset to false on every successful HTTP response.
-let _kalshiLastFetchHadError = false;
-
-/**
- * Generate cache key from parameters.
- * `limit` is intentionally excluded so callers with different limits share
- * the same cached pool — a limit=10 request will reuse a limit=50 cache entry
- * (and vice-versa when the cached set is large enough).
- */
-function getCacheKey(params?: {
-  category?: string;
-  status?: string;
-  limit?: number;
-  search?: string;
-}): string {
-  const { category, status, search } = params || {};
-  return `kalshi:${category || 'all'}:${status || 'open'}:${search || ''}`;
-}
-
-/**
- * Get cached markets if available and not expired.
- * If `limit` is provided and the cached set is smaller than `limit`, returns
- * null (cache miss) so the caller re-fetches with the larger limit.
- * If the cached set is >= `limit`, returns a slice of exactly `limit` items.
- */
-function getCachedMarkets(cacheKey: string, limit?: number): KalshiMarket[] | null {
-  const cached = marketCache.get(cacheKey);
-
-  if (!cached) return null;
-
-  const now = Date.now();
-  if ((now - cached.timestamp) > cached.ttl) {
-    console.log('[KALSHI] Cache expired for key:', cacheKey);
-    marketCache.delete(cacheKey);
-    return null;
-  }
-
-  // If the caller needs more markets than what's cached, treat as a miss so
-  // we re-fetch a larger set and update the cache entry.
-  if (limit !== undefined && cached.data.length < limit) {
-    console.log(`[KALSHI] Cache hit but only ${cached.data.length} markets cached, need ${limit} — re-fetching`);
-    return null;
-  }
-
-  const remainingMs = cached.ttl - (now - cached.timestamp);
-  const result = limit !== undefined ? cached.data.slice(0, limit) : cached.data;
-  console.log(`[KALSHI] Cache hit! ${result.length} markets, remaining TTL: ${Math.floor(remainingMs / 1000)}s`);
-  return result;
-}
-
-/**
- * Store markets in cache with TTL
- */
-function cacheMarkets(cacheKey: string, markets: KalshiMarket[], ttlMs: number = 60000): void {
-  marketCache.set(cacheKey, {
-    data: markets,
-    timestamp: Date.now(),
-    ttl: ttlMs,
-  });
-  console.log(`[KALSHI] Cached ${markets.length} markets with ${ttlMs / 1000}s TTL`);
-}
-
-/**
- * Build auth headers.
- * Priority:
- *  1. RSA-PSS signed headers (KALSHI_ACCESS_KEY/KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY)
- *  2. Bearer token (KALSHI_API_KEY) — used when no RSA key pair is configured
- *  3. Unauthenticated — GET /markets was previously public; kept as last resort
- */
-function buildHeaders(url: string = '', method: string = 'GET'): Record<string, string> {
+function buildHeaders(url: string, method = 'GET'): Record<string, string> {
   const headers: Record<string, string> = {
-    'Accept': 'application/json',
+    Accept: 'application/json',
     'User-Agent': 'LeverageAI/1.0',
   };
-  // Support new KALSHI_ACCESS_KEY name as well as legacy KALSHI_API_KEY_ID
-  const keyId  = process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID;
+
+  const keyId = process.env.KALSHI_ACCESS_KEY || process.env.KALSHI_API_KEY_ID;
   const rawKey = process.env.KALSHI_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  // Wrap bare base64 in PEM headers if needed
   const privateKey = rawKey && !rawKey.includes('-----')
     ? `-----BEGIN RSA PRIVATE KEY-----\n${rawKey.match(/.{1,64}/g)?.join('\n') ?? rawKey}\n-----END RSA PRIVATE KEY-----`
     : rawKey;
-  if (keyId && privateKey && url) {
+
+  if (keyId && privateKey) {
     try {
+      const ts = Date.now().toString();
       const { pathname } = new URL(url);
-      const timestamp = Date.now().toString();
-      // Kalshi docs: sign timestamp + METHOD + path (no query params)
-      const message = `${timestamp}${method.toUpperCase()}${pathname}`;
-      const sign    = crypto.createSign('RSA-SHA256');
-      sign.update(message);
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(`${ts}${method.toUpperCase()}${pathname}`);
       sign.end();
-      // Kalshi requires RSA-PSS padding, salt length = digest length (32 bytes for SHA-256)
-      const signature = sign.sign(
+      headers['KALSHI-ACCESS-KEY']       = keyId;
+      headers['KALSHI-ACCESS-TIMESTAMP'] = ts;
+      headers['KALSHI-ACCESS-SIGNATURE'] = sign.sign(
         { key: privateKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 },
         'base64',
       );
-      headers['KALSHI-ACCESS-KEY']       = keyId;
-      headers['KALSHI-ACCESS-TIMESTAMP'] = timestamp;
-      headers['KALSHI-ACCESS-SIGNATURE'] = signature;
     } catch (err) {
-      console.error('[KALSHI] RSA sign failed (auth will be skipped):', err instanceof Error ? err.message : err);
+      console.error('[KALSHI] RSA sign failed:', err instanceof Error ? err.message : err);
     }
-  } else {
-    // No RSA key pair — fall back to simple bearer token if configured
-    const bearerToken = process.env.KALSHI_API_KEY;
-    if (bearerToken) {
-      headers['Authorization'] = `Bearer ${bearerToken}`;
-    }
+  } else if (process.env.KALSHI_API_KEY) {
+    headers['Authorization'] = `Bearer ${process.env.KALSHI_API_KEY}`;
   }
+
   return headers;
 }
 
-/** Map cryptic Kalshi series/event tickers to human-readable category labels */
+// ── Parsing ───────────────────────────────────────────────────────────────────
+
+function parseCents(str: string | undefined | null, fallback: number): number {
+  if (str != null && str !== '') {
+    const v = parseFloat(str);
+    if (Number.isFinite(v) && v > 0) return Math.round(v * 100);
+  }
+  return fallback;
+}
+
+function parseFp(str: string | undefined | null, fallback: number): number {
+  if (str != null && str !== '') {
+    const v = parseFloat(str);
+    if (Number.isFinite(v) && v > 0) return Math.round(v);
+  }
+  return fallback;
+}
+
+const CATEGORY_MAP: Record<string, string> = {
+  KXBT: 'Crypto', KXBTD: 'Crypto', KXETH: 'Crypto',
+  NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL',
+  NCAAB: 'College Basketball', NCAAF: 'College Football',
+  NASCAR: 'NASCAR', PGA: 'Golf', F1: 'Formula 1',
+  UFC: 'MMA', BOXING: 'Boxing', WNBA: 'WNBA',
+  KXUSSENATE: 'Politics', KXUSHOUSE: 'Politics', KXUSGOV: 'Politics',
+  PRES: 'Politics', POTUS: 'Politics',
+  FED: 'Finance', KXFED: 'Finance', FOMC: 'Finance',
+  KXCPI: 'Finance', KXGDP: 'Finance', SP500: 'Finance',
+  KXSP: 'Finance', KXNQ: 'Finance',
+  WEATHER: 'Weather', TEMP: 'Weather', HURR: 'Weather',
+  OSCAR: 'Entertainment', GRAMMY: 'Entertainment',
+  EMMY: 'Entertainment', GOLDEN: 'Entertainment',
+};
+
 function normalizeCategoryLabel(raw: string): string {
   if (!raw) return 'Prediction Market';
   const upper = raw.toUpperCase();
-  const map: Record<string, string> = {
-    'KXBT': 'Crypto', 'KXBTD': 'Crypto', 'KXETH': 'Crypto',
-    'NFL': 'NFL', 'NBA': 'NBA', 'MLB': 'MLB', 'NHL': 'NHL',
-    'NCAAB': 'College Basketball', 'NCAAF': 'College Football',
-    'NASCAR': 'NASCAR', 'PGA': 'Golf', 'F1': 'Formula 1',
-    'UFC': 'MMA', 'BOXING': 'Boxing', 'WNBA': 'WNBA',
-    'KXUSSENATE': 'Politics', 'KXUSHOUSE': 'Politics', 'KXUSGOV': 'Politics',
-    'PRES': 'Politics', 'POTUS': 'Politics',
-    'FED': 'Finance', 'KXFED': 'Finance', 'FOMC': 'Finance',
-    'KXCPI': 'Finance', 'KXGDP': 'Finance', 'SP500': 'Finance',
-    'KXSP': 'Finance', 'KXNQ': 'Finance',
-    'WEATHER': 'Weather', 'TEMP': 'Weather', 'HURR': 'Weather',
-    'OSCAR': 'Entertainment', 'GRAMMY': 'Entertainment',
-    'EMMY': 'Entertainment', 'GOLDEN': 'Entertainment',
-  };
-  if (map[upper]) return map[upper];
-  for (const [key, val] of Object.entries(map)) {
+  if (CATEGORY_MAP[upper]) return CATEGORY_MAP[upper];
+  for (const [key, val] of Object.entries(CATEGORY_MAP)) {
     if (upper.startsWith(key)) return val;
   }
   if (raw.length < 30 && /^[A-Za-z\s]+$/.test(raw)) {
@@ -198,9 +157,58 @@ function normalizeCategoryLabel(raw: string): string {
   return 'Prediction Market';
 }
 
-// Sports series-ticker prefixes — ground truth for identifying sports markets.
-// The Kalshi v2 API returns these in the series_ticker field; normalizeCategoryLabel()
-// maps them to readable names but seriesTicker is authoritative.
+function parseMarket(m: any): KalshiMarket {
+  const yesBid    = parseCents(m.yes_bid_dollars,          m.yes_bid          ?? 0);
+  const yesAsk    = parseCents(m.yes_ask_dollars,          m.yes_ask          ?? 0);
+  const noBid     = parseCents(m.no_bid_dollars,           m.no_bid           ?? 0);
+  const noAsk     = parseCents(m.no_ask_dollars,           m.no_ask           ?? 0);
+  const lastPrice = parseCents(m.last_price_dollars,       m.last_price       ?? 0);
+  const prevBid   = parseCents(m.previous_yes_bid_dollars, m.previous_yes_bid ?? 0);
+
+  const yesMid    = yesBid > 0 && yesAsk > 0 ? Math.round((yesBid + yesAsk) / 2) : 0;
+  const rawYes    = lastPrice > 0 ? lastPrice : yesMid > 0 ? yesMid : yesAsk > 0 ? yesAsk : yesBid > 0 ? yesBid : 50;
+  const yesPrice  = Math.min(99, Math.max(1, rawYes));
+  const noPrice   = noBid > 0 && noAsk > 0 ? Math.round((noBid + noAsk) / 2) : Math.max(0, 100 - yesPrice);
+
+  const toStr = (v: unknown): string =>
+    Array.isArray(v) ? String(v[0] ?? '') : typeof v === 'string' ? v : '';
+
+  const rawCategory  = toStr(m.category) || toStr(m.series_ticker) || toStr(m.event_ticker) || '';
+  const rawYesSub    = toStr(m.yes_sub_title).replace(/^(yes|no)\s+/i, '').trim();
+  const singleYesSub = rawYesSub.split(/,\s*(yes|no)\s+/i)[0].trim();
+  const composite    = toStr(m.event_title) && singleYesSub ? `${toStr(m.event_title)}: ${singleYesSub}` : '';
+  const rawFull      = toStr(m.title) || composite || toStr(m.event_title) || toStr(m.subtitle) || '';
+  // Kalshi combo markets concatenate outcomes with ",yes "/",no " — split and rejoin with ·
+  const parts        = rawFull.split(/,\s*(yes|no)\s+/i).filter((_, i) => i % 2 === 0).map(s => s.trim()).filter(Boolean);
+  const cleanTitle   = (parts.length > 1 ? parts.join(' · ') : rawFull.trim()).replace(/^(yes|no)\s+/i, '').trim();
+
+  return {
+    ticker:       m.ticker || '',
+    title:        cleanTitle,
+    category:     normalizeCategoryLabel(rawCategory),
+    subtitle:     toStr(m.subtitle) || (singleYesSub ? `Yes: ${singleYesSub}` : '') || toStr(m.event_title) || '',
+    yesPrice,
+    noPrice,
+    yesBid,
+    yesAsk,
+    noBid,
+    noAsk,
+    spread:       Math.max(0, yesAsk - yesBid),
+    lastPrice,
+    volume24h:    parseFp(m.volume_24h_fp,    m.volume_24h    ?? 0),
+    eventTicker:  m.event_ticker  || '',
+    seriesTicker: m.series_ticker || '',
+    priceChange:  prevBid > 0 && prevBid !== yesBid ? yesBid - prevBid : 0,
+    volume:       parseFp(m.volume_fp,        m.volume        ?? m.volume_24h ?? 0),
+    openInterest: parseFp(m.open_interest_fp, m.open_interest ?? 0),
+    closeTime:    m.close_time || m.expiration_time || m.end_date || '',
+    status:       m.status || 'active',
+    priceIsReal:  lastPrice > 0 || yesBid > 0 || yesAsk > 0,
+  };
+}
+
+// ── Market Classification ─────────────────────────────────────────────────────
+
 export const SPORTS_SERIES_PREFIXES = [
   'NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'NCAAF',
   'NASCAR', 'PGA', 'UFC', 'WNBA',
@@ -209,423 +217,185 @@ export const SPORTS_SERIES_PREFIXES = [
   'KXF1', 'KXGOLF', 'KXTENNIS', 'KXSOCCER',
 ];
 
-const _SPORTS_CATEGORIES = new Set([
+const SPORTS_CATEGORIES = new Set([
   'NFL', 'NBA', 'MLB', 'NHL',
   'NCAAB', 'College Basketball', 'NCAAF', 'College Football',
   'NASCAR', 'Golf', 'Formula 1', 'MMA', 'Boxing', 'WNBA',
   'Soccer', 'Tennis', 'Sports', 'Baseball', 'Basketball', 'Football', 'Hockey',
 ]);
 
-// Title-based sports detection — used when Kalshi returns empty seriesTicker and
-// category='Prediction Market' (observed May 2026: Kalshi reclassified combo/parlay
-// markets to a single generic category, breaking the seriesTicker prefix approach).
+const SPORTS_TITLE_RE = /\b(goals?|strikeouts?|touchdowns?|rebounds?|assists?|home\s*runs?|stolen\s*bases?|rushing\s*yards?|passing\s*yards?|receiving\s*yards?|receptions?|tackles?|sacks?|blocks?|steals?|field\s*goals?|free\s*throws?|three[\s-]?pointers?|shots?\s*on\s*goal|clean\s*sheets?|both\s*teams?\s*to\s*score|runs?\s*scored|batting|pitching)\b/i;
+const PLAYER_PROP_RE  = /[A-Z][a-z][\w.]* [A-Z][a-z]\w*:\s*\d+[+]/;
+const NON_SPORTS_RE   = /\b(election|senator?|congress(?:ional)?|president(?:ial)?|trump|biden|harris|kennedy|vote|democrat|republican|electoral|inaugur|ballot|governor|primary|bitcoin|ethereum|crypto\b|BTC|ETH|nasdaq|S&P|GDP|CPI|inflation|federal\s*reserve|FOMC|oscar|grammy|emmy|golden\s*globe|box\s*office|hurricane|tornado|earthquake|temperature|weather|rainfall)\b/i;
 
-/** Matches sports-specific prop language in a market title. */
-const _SPORTS_TITLE_RE = /\b(goals?|strikeouts?|touchdowns?|rebounds?|assists?|home\s*runs?|stolen\s*bases?|rushing\s*yards?|passing\s*yards?|receiving\s*yards?|receptions?|tackles?|sacks?|blocks?|steals?|field\s*goals?|free\s*throws?|three[\s-]?pointers?|shots?\s*on\s*goal|clean\s*sheets?|both\s*teams?\s*to\s*score|runs?\s*scored|batting|pitching)\b/i;
-
-/** Player-prop format: "Firstname Lastname: N+" or "F. Lastname: N+" */
-const _PLAYER_PROP_TITLE_RE = /[A-Z][a-z][\w.]* [A-Z][a-z]\w*:\s*\d+[+]/;
-
-/** Keywords that reliably indicate NON-sports markets — suppresses title heuristics. */
-const _NON_SPORTS_TITLE_RE = /\b(election|senator?|congress(?:ional)?|president(?:ial)?|trump|biden|harris|kennedy|vote|democrat|republican|electoral|inaugur|ballot|governor|primary|bitcoin|ethereum|crypto\b|BTC|ETH|nasdaq|S&P|GDP|CPI|inflation|federal\s*reserve|FOMC|oscar|grammy|emmy|golden\s*globe|box\s*office|hurricane|tornado|earthquake|temperature|weather|rainfall)\b/i;
-
-/**
- * Returns true when the market is a sports/prop market.
- *
- * Detection order:
- *  1. seriesTicker prefix match (most authoritative)
- *  2. Normalized category string
- *  3. ticker / eventTicker prefix match (populated even when seriesTicker is empty)
- *  4. Title-based heuristics (fallback for Kalshi combo/parlay markets reclassified
- *     to category='Prediction Market' with empty seriesTicker)
- */
-export function isSportsMarket(m: {
-  seriesTicker?: string;
-  category?: string;
-  ticker?: string;
-  eventTicker?: string;
-  title?: string;
-}): boolean {
+export function isSportsMarket(m: Pick<KalshiMarket, 'seriesTicker' | 'category' | 'ticker' | 'eventTicker' | 'title'>): boolean {
   const series = (m.seriesTicker || '').toUpperCase();
   if (series && SPORTS_SERIES_PREFIXES.some(p => series.startsWith(p))) return true;
-  if (_SPORTS_CATEGORIES.has(m.category || '')) return true;
-
-  // ticker / eventTicker may contain sports prefixes even when seriesTicker is empty
+  if (SPORTS_CATEGORIES.has(m.category || '')) return true;
   const tkr = (m.ticker || '').toUpperCase();
   const evt = (m.eventTicker || '').toUpperCase();
   if (tkr && SPORTS_SERIES_PREFIXES.some(p => tkr.startsWith(p))) return true;
   if (evt && SPORTS_SERIES_PREFIXES.some(p => evt.startsWith(p))) return true;
-
-  // Title-based fallback
   const title = m.title || '';
-  if (!title || _NON_SPORTS_TITLE_RE.test(title)) return false;
-  if (_PLAYER_PROP_TITLE_RE.test(title)) return true;
-  if (_SPORTS_TITLE_RE.test(title)) return true;
-  // Multi-leg sports combo: · separated legs where at least one is a player prop,
-  // OR 3+ legs that all begin with a capital letter (team-combo parlay).
-  // The NON_SPORTS check above already blocks political multi-leg combos.
-  const parts = title.split(/\s*[·•]\s*/).map(p => p.trim()).filter(p => p.length > 3);
-  if (parts.length >= 2 && parts.some(p => _PLAYER_PROP_TITLE_RE.test(p))) return true;
-  if (parts.length >= 3 && parts.every(p => /^[A-Z]/.test(p))) return true;
-
+  if (!title || NON_SPORTS_RE.test(title)) return false;
+  if (PLAYER_PROP_RE.test(title)) return true;
+  if (SPORTS_TITLE_RE.test(title)) return true;
+  const legs = title.split(/\s*[·•]\s*/).map(p => p.trim()).filter(p => p.length > 3);
+  if (legs.length >= 2 && legs.some(p => PLAYER_PROP_RE.test(p))) return true;
+  if (legs.length >= 3 && legs.every(p => /^[A-Z]/.test(p))) return true;
   return false;
 }
 
+const POLITICAL_SERIES = ['KXUSSENATE', 'KXUSHOUSE', 'KXUSGOV', 'PRES', 'POTUS'];
+const POLITICS_RE   = /\b(election|senate|congress(?:ional)?|house\s+of\s+rep|representative|president(?:ial)?|governor|mayor|democrat|republican|gop|midterm|primary|ballot|vote|electoral|inaugur)\b/i;
+const WEATHER_RE    = /\b(temperature|degrees?|fahrenheit|celsius|rainfall|precipitation|hurricane|tornado|earthquake|flood|snow|blizzard|weather|climate)\b/i;
+const FINANCE_RE    = /\b(stock|S&P|NASDAQ|bitcoin|ethereum|crypto|interest\s+rate|federal\s+reserve|inflation|GDP|recession|unemployment|treasury|bond|yield|ETH|BTC)\b/i;
+const FINANCE_SERIES_RE = /^(KXBT|KXETH|KXCPI|KXGDP|KXSP|KXNQ|KXFED|SP500|FED|FOMC)/i;
+const ENTERTAINMENT_RE  = /\b(oscar|grammy|emmy|tony\s+award|golden\s+globe|bafta|box\s+office|billboard|academy\s+award|best\s+picture|best\s+actor|best\s+actress|cannes|mtv\s+award|vma|reality\s+show)\b/i;
+
+function isPoliticsMarket(m: KalshiMarket): boolean {
+  const s = (m.seriesTicker || '').toUpperCase();
+  if (POLITICAL_SERIES.some(p => s.startsWith(p))) return true;
+  if (m.category === 'Politics') return true;
+  return POLITICS_RE.test(`${m.title} ${m.subtitle}`);
+}
+
+function isWeatherMarket(m: KalshiMarket): boolean {
+  const s = (m.seriesTicker || '').toUpperCase();
+  if (s.startsWith('WEATHER') || s.startsWith('TEMP') || s.startsWith('HURR') || s.startsWith('KXHI')) return true;
+  if (m.category === 'Weather') return true;
+  return WEATHER_RE.test(`${m.title} ${m.subtitle}`);
+}
+
+function isFinanceMarket(m: KalshiMarket): boolean {
+  if (FINANCE_SERIES_RE.test(m.seriesTicker || '')) return true;
+  if (m.category === 'Finance' || m.category === 'Crypto') return true;
+  return FINANCE_RE.test(`${m.title} ${m.subtitle}`);
+}
+
+function isEntertainmentMarket(m: KalshiMarket): boolean {
+  return ENTERTAINMENT_RE.test(`${m.title} ${m.subtitle}`);
+}
+
+// ── Cache + Dedup ─────────────────────────────────────────────────────────────
+
+interface CacheEntry { markets: KalshiMarket[]; ts: number; ttl: number }
+const _cache    = new Map<string, CacheEntry>();
+const _inflight = new Map<string, Promise<KalshiMarket[]>>();
+
+function cacheGet(key: string): KalshiMarket[] | null {
+  const e = _cache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.ts > e.ttl) { _cache.delete(key); return null; }
+  return e.markets;
+}
+
+function cacheSet(key: string, markets: KalshiMarket[], ttl = POOL_CACHE_TTL_MS): void {
+  _cache.set(key, { markets, ts: Date.now(), ttl });
+}
+
+// ── HTTP ──────────────────────────────────────────────────────────────────────
+
+let _lastFetchHadError = false;
+
+async function kalshiGet(path: string, params?: Record<string, string>): Promise<any> {
+  const qp  = params && Object.keys(params).length ? `?${new URLSearchParams(params)}` : '';
+  const url  = `${BASE_URL}${path}${qp}`;
+  const res  = await fetch(url, {
+    headers: buildHeaders(url),
+    signal:  AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Kalshi ${res.status}: ${body.slice(0, 120)}`);
+  }
+  return res.json();
+}
+
+// ── Page Fetch + Quality Filter ───────────────────────────────────────────────
+
+// Ticker-only titles (e.g. "KXBT-25DEC25-T45000") and internal cross-category
+// markets have no public Kalshi page — exclude them from card results.
+const TICKER_TITLE_RE   = /^[A-Z0-9\-\.%]+$/;
+const CROSS_CAT_RE      = /^KXMVE?CROSS/i;
+const HEX_SEGMENT_RE    = /-[0-9a-f]{12,}/i;
+
+function qualityFilter(markets: KalshiMarket[]): KalshiMarket[] {
+  return markets.filter(m => {
+    if (!m.title || m.title.length < 10) return false;
+    if (TICKER_TITLE_RE.test(m.title)) return false;
+    // Political series always pass — their event tickers can carry short hash suffixes
+    const series = (m.seriesTicker || '').toUpperCase();
+    if (POLITICAL_SERIES.some(p => series.startsWith(p))) return true;
+    if (CROSS_CAT_RE.test(m.seriesTicker || '') || CROSS_CAT_RE.test(m.eventTicker || '') || CROSS_CAT_RE.test(m.ticker || '')) return false;
+    if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) return false;
+    if (m.ticker     && HEX_SEGMENT_RE.test(m.ticker))       return false;
+    return true;
+  });
+}
+
+async function fetchPage(params: Record<string, string>): Promise<{ markets: KalshiMarket[]; cursor: string | null }> {
+  const data = await kalshiGet('/markets', params);
+  if (!data.markets || !Array.isArray(data.markets)) return { markets: [], cursor: null };
+  const markets = qualityFilter(data.markets.map(parseMarket));
+  return { markets, cursor: data.cursor && data.cursor !== '' ? data.cursor : null };
+}
+
+// ── Shared Market Pool ────────────────────────────────────────────────────────
+
+const POOL_KEY = 'kalshi:pool';
+
 /**
- * Parse a dollar string from the Kalshi v2 API into integer cents.
- * Kalshi transitioned from integer cents (yes_bid=56) to dollar strings
- * (yes_bid_dollars="0.5600"). Support both to stay backward-compatible.
+ * Fetch ALL open Kalshi markets, cached for 60 s.
+ * Every topic-specific function filters this pool client-side — the API's
+ * search/category params are silently ignored, so issuing separate per-topic
+ * requests would just return the same page multiple times.
  */
-function parseCents(dollarsStr: string | undefined | null, fallbackCents: number): number {
-  if (dollarsStr !== undefined && dollarsStr !== null && dollarsStr !== '') {
-    const v = parseFloat(dollarsStr);
-    if (Number.isFinite(v) && v > 0) return Math.round(v * 100);
-  }
-  return fallbackCents;
-}
+async function getMarketPool(maxMarkets = 1000): Promise<KalshiMarket[]> {
+  const cached = cacheGet(POOL_KEY);
+  if (cached) return cached;
 
-/**
- * Parse a fixed-point volume string from the Kalshi v2 API into a number.
- * Kalshi transitioned from integer counts (volume=1000) to fp strings
- * (volume_fp="1000.00"). Support both to stay backward-compatible.
- */
-function parseFp(fpStr: string | undefined | null, fallbackInt: number): number {
-  if (fpStr !== undefined && fpStr !== null && fpStr !== '') {
-    const v = parseFloat(fpStr);
-    if (Number.isFinite(v) && v > 0) return Math.round(v);
-  }
-  return fallbackInt;
-}
+  const existing = _inflight.get(POOL_KEY);
+  if (existing) return existing;
 
-/** Parse a raw Kalshi market response object into a typed KalshiMarket */
-function parseMarket(m: any): KalshiMarket {
-  // Kalshi API v2 uses _dollars string fields; v1 used integer cents.
-  // Prefer the new _dollars fields; fall back to the old integer fields.
-  const yesBid    = parseCents(m.yes_bid_dollars,   m.yes_bid    ?? 0);
-  const yesAsk    = parseCents(m.yes_ask_dollars,   m.yes_ask    ?? 0);
-  const noBid     = parseCents(m.no_bid_dollars,    m.no_bid     ?? 0);
-  const noAsk     = parseCents(m.no_ask_dollars,    m.no_ask     ?? 0);
-  const lastPrice = parseCents(m.last_price_dollars, m.last_price ?? 0);
-  // previous_yes_bid is 0 when the market has never had a bid — treat that as absent
-  const prevBid   = parseCents(m.previous_yes_bid_dollars, m.previous_yes_bid ?? 0);
-
-  // Best estimate for YES probability: prefer last traded price, then midpoint, then ask/bid.
-  // IMPORTANT: never fall through to floor_strike — it is a numeric strike price (e.g. 45000
-  // for a BTC contract), not a cents probability, and would corrupt the probability bar.
-  const yesMidpoint = yesBid > 0 && yesAsk > 0 ? Math.round((yesBid + yesAsk) / 2) : 0;
-  const rawYesPrice =
-    lastPrice > 0   ? lastPrice   :
-    yesMidpoint > 0 ? yesMidpoint :
-    yesAsk > 0      ? yesAsk      :
-    yesBid > 0      ? yesBid      :
-    50; // genuine 50¢ default only when no price signals exist
-  // Kalshi markets trade in the 1–99¢ range — clamp to prevent rendering edge-cases
-  const yesPrice = Math.min(99, Math.max(1, rawYesPrice));
-
-  const noPrice  = noBid > 0 && noAsk > 0
-    ? Math.round((noBid + noAsk) / 2)
-    : Math.max(0, 100 - yesPrice);
-
-  // Safe string coercion — Kalshi occasionally returns array values for string fields;
-  // take the first element when that happens, otherwise coerce to string or ''.
-  const toStr = (v: unknown): string =>
-    Array.isArray(v) ? String(v[0] ?? '') : typeof v === 'string' ? v : '';
-
-  const rawCategory = toStr(m.category) || toStr(m.series_ticker) || toStr(m.event_ticker) || '';
-
-  // yes_sub_title is a short outcome label (e.g. "yes Baylor") — never use it
-  // alone as the card title. When a market lacks a proper title, combine
-  // event_title + cleaned yes_sub_title so the result is still readable.
-  const rawYesSub = toStr(m.yes_sub_title);
-  // Strip leading "yes "/"no " prefix that Kalshi sometimes surfaces in sub_title fields
-  const cleanYesSub = rawYesSub.replace(/^(yes|no)\s+/i, '').trim();
-  // Guard against Kalshi concatenating multiple market sub-titles into one field
-  // (e.g. "Scottie Barnes: 2+,yes Precious Achiuwa: 10+,...") — keep only the first entry.
-  const singleYesSub = cleanYesSub.split(/,\s*(yes|no)\s+/i)[0].trim();
-
-  const compositeTitle =
-    toStr(m.event_title) && singleYesSub ? `${toStr(m.event_title)}: ${singleYesSub}` : '';
-
-  // Primary title — also strip any stray "yes "/"no " prefix that leaks through
-  const rawTitleFull: string = toStr(m.title) || compositeTitle || toStr(m.event_title) || toStr(m.subtitle) || '';
-  // Kalshi combo markets concatenate outcomes as "Boston,yes Portland,yes Amen Thompson: 4+"
-  // Split on the ",yes "/" ,no " separator and rejoin with · for a readable card title
-  const titleParts = rawTitleFull.split(/,\s*(yes|no)\s+/i).filter((_, i) => i % 2 === 0).map(s => s.trim()).filter(Boolean);
-  const rawTitle = titleParts.length > 1 ? titleParts.join(' · ') : rawTitleFull.trim();
-  const cleanTitle = rawTitle.replace(/^(yes|no)\s+/i, '').trim();
-
-  // Price change: only compute when previous_yes_bid is a real (non-zero) prior snapshot.
-  // When prevBid === 0 the field was unset by the API (fresh market), so the delta of
-  // `yesBid - 0` would falsely appear as a large positive move — guard against that.
-  const priceChange = (prevBid > 0 && prevBid !== yesBid) ? yesBid - prevBid : 0;
-
-  return {
-    ticker: m.ticker || '',
-    title: cleanTitle,
-    category: normalizeCategoryLabel(rawCategory),
-    subtitle: toStr(m.subtitle) || (singleYesSub ? `Yes: ${singleYesSub}` : '') || toStr(m.event_title) || '',
-    yesPrice,
-    noPrice,
-    yesBid,
-    yesAsk,
-    noBid,
-    noAsk,
-    spread: Math.max(0, yesAsk - yesBid),
-    lastPrice,
-    // Kalshi v2 uses _fp (fixed-point string) for volume fields; v1 used integers.
-    volume24h:    parseFp(m.volume_24h_fp,    m.volume_24h    ?? 0),
-    eventTicker:  m.event_ticker || '',
-    seriesTicker: m.series_ticker || '',
-    priceChange,
-    volume:       parseFp(m.volume_fp,        m.volume        ?? m.volume_24h ?? 0),
-    openInterest: parseFp(m.open_interest_fp, m.open_interest ?? 0),
-    closeTime: m.close_time || m.expiration_time || m.end_date || '',
-    status: m.status || 'active',
-    priceIsReal: lastPrice > 0 || yesBid > 0 || yesAsk > 0,
-  };
-}
-
-// ── Circuit Breaker ───────────────────────────────────────────────────────────
-// Opens after 5 consecutive failures; auto-resets to half-open after 60 s.
-// In half-open state one probe request is allowed — success closes the breaker.
-// Force-resets to closed after maxOpenMs (default 10 min) to recover stale
-// open state in long-lived Lambda instances.
-
-class CircuitBreaker {
-  private failures = 0;
-  private lastFailTime = 0;
-  private openedAt = 0;
-  private state: 'closed' | 'open' | 'half-open' = 'closed';
-  private readonly threshold: number;
-  private readonly resetTimeoutMs: number;
-  private readonly maxOpenMs: number;
-
-  constructor(threshold = 5, resetTimeoutMs = 60_000, maxOpenMs = 600_000) {
-    this.threshold      = threshold;
-    this.resetTimeoutMs = resetTimeoutMs;
-    this.maxOpenMs      = maxOpenMs;
-  }
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.state === 'open') {
-      const msOpen = Date.now() - this.openedAt;
-      if (msOpen >= this.maxOpenMs) {
-        // Breaker stuck open in a warm Lambda for >10 min — force reset
-        this.forceReset();
-        console.warn(`[KALSHI] Circuit breaker force-reset after ${Math.round(msOpen / 60000)}m open`);
-      } else if (Date.now() - this.lastFailTime >= this.resetTimeoutMs) {
-        this.state = 'half-open';
-        console.log('[KALSHI] Circuit breaker → half-open (probe)');
-      } else {
-        const msSinceFail = Date.now() - this.lastFailTime;
-        throw new Error(`[KALSHI] Circuit breaker OPEN (${Math.round(msSinceFail / 1000)}s since last failure — will retry in ${Math.round((this.resetTimeoutMs - msSinceFail) / 1000)}s)`);
-      }
-    }
+  const promise = (async (): Promise<KalshiMarket[]> => {
+    const all  = new Map<string, KalshiMarket>(); // keyed by ticker for dedup
+    let cursor: string | null = null;
+    let page   = 0;
+    _lastFetchHadError = false;
 
     try {
-      const result = await fn();
-      this._onSuccess();
+      do {
+        page++;
+        const params: Record<string, string> = { limit: '1000', status: 'open' };
+        if (cursor) params.cursor = cursor;
+
+        const { markets, cursor: next } = await fetchPage(params);
+        for (const m of markets) all.set(m.ticker, m);
+        cursor = next;
+        console.log(`[KALSHI] Pool page ${page}: +${markets.length} (total: ${all.size})`);
+      } while (cursor && all.size < maxMarkets);
+
+      const result = Array.from(all.values());
+      const cats   = [...new Set(result.map(m => m.category))].filter(Boolean);
+      console.log(`[KALSHI] Pool ready: ${result.length} markets — ${cats.slice(0, 10).join(', ')}`);
+      cacheSet(POOL_KEY, result, POOL_CACHE_TTL_MS);
       return result;
     } catch (err) {
-      this._onFailure();
-      throw err;
+      _lastFetchHadError = true;
+      console.error('[KALSHI] Pool fetch failed:', err instanceof Error ? err.message : err);
+      return [];
     }
-  }
+  })();
 
-  forceReset(): void {
-    const wasOpen = this.state !== 'closed';
-    this.failures     = 0;
-    this.state        = 'closed';
-    this.lastFailTime = 0;
-    this.openedAt     = 0;
-    // Only log when there was an actual state change — avoids noisy "force-reset"
-    // messages on every cron tick when the breaker was already closed.
-    if (wasOpen) {
-      console.log('[KALSHI] Circuit breaker force-reset → closed');
-    }
-  }
-
-  private _onSuccess(): void {
-    this.failures = 0;
-    if (this.state !== 'closed') {
-      console.log('[KALSHI] Circuit breaker → closed');
-    }
-    this.state = 'closed';
-  }
-
-  private _onFailure(): void {
-    this.failures++;
-    this.lastFailTime = Date.now();
-    if (this.state === 'half-open') {
-      // Probe failed — go back to open so the next reset attempt is explicit
-      this.state    = 'open';
-      this.openedAt = Date.now();
-      console.warn(`[KALSHI] Circuit breaker probe FAILED → re-opened (failures=${this.failures})`);
-    } else if (this.failures >= this.threshold && this.state === 'closed') {
-      this.state    = 'open';
-      this.openedAt = Date.now();
-      console.error(`[KALSHI] Circuit breaker OPENED after ${this.failures} consecutive failures`);
-    }
-  }
-
-  get isOpen(): boolean { return this.state === 'open'; }
-  get currentState(): string { return this.state; }
+  _inflight.set(POOL_KEY, promise);
+  promise.finally(() => _inflight.delete(POOL_KEY));
+  return promise;
 }
 
-const kalshiCircuitBreaker = new CircuitBreaker();
+// ── Public Fetch API ──────────────────────────────────────────────────────────
 
-/** Force-close the shared Kalshi circuit breaker. Call after a confirmed successful API response. */
-export function resetKalshiCircuitBreaker(): void {
-  kalshiCircuitBreaker.forceReset();
-}
-
-/**
- * Fetch a single page of markets.
- * Tries the canonical api.kalshi.com first; falls back to api.elections.kalshi.com.
- * Returns parsed markets and the next cursor (null when done).
- */
-async function fetchKalshiPage(queryParams: URLSearchParams): Promise<KalshiPage> {
-  return kalshiCircuitBreaker.execute(() => _fetchKalshiPageInner(queryParams));
-}
-
-async function _fetchKalshiPageInner(queryParams: URLSearchParams): Promise<KalshiPage> {
-  // Deduplicate: both constants point to the same host. Build a unique URL list so we
-  // never hit the same endpoint twice (which would just double latency on errors).
-  const urlSet = new Set([
-    `${KALSHI_TRADING_URL}/markets?${queryParams}`,
-    `${KALSHI_FALLBACK_URL}/markets?${queryParams}`,
-  ]);
-  const urls = Array.from(urlSet);
-
-  let lastError: Error | null = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        headers: buildHeaders(url),
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        const host = new URL(url).hostname;
-        console.error(`[KALSHI] API error ${response.status} at ${host} — ${errorText.substring(0, 200)}`);
-        lastError = new Error(`Kalshi API error: ${response.status} ${response.statusText}`);
-        // 4xx errors are permanent — retrying (or trying the identical fallback URL) will
-        // never succeed. Break immediately so the caller does not waste more attempts.
-        // Exception: 429 is transient and the caller already handles back-off.
-        if (response.status !== 429 && response.status >= 400 && response.status < 500) break;
-        // 429 and 5xx: break (same host) and let the retry layer handle back-off.
-        break;
-      }
-
-      const data = await response.json();
-
-      if (!data.markets || !Array.isArray(data.markets)) {
-        console.warn('[KALSHI] Unexpected response format, keys:', Object.keys(data).join(', '));
-        _kalshiLastFetchHadError = false; // 200 OK — not an error
-        return { markets: [], cursor: null };
-      }
-
-      // ── Quality / sanity filters ──────────────────────────────────────────
-      // Reject titles shorter than 10 chars or that look like raw ticker symbols
-      // (all-caps + digits + dashes/dots/%, e.g. "KXBT-25DEC25-T45000")
-      const TICKER_RE = /^[A-Z0-9\-\.%]+$/;
-
-      // Internal cross-category / multi-leg markets have UUID-like hex segments in their
-      // event_ticker (e.g. "KXMVECROSSCATEGORY-S20269C2BE3773B8"). These markets don't
-      // have public Kalshi web pages, so they produce 404 deep links.
-      //
-      // IMPORTANT: threshold must be ≥ 10 to avoid false-positive matches on date segments
-      // in normal Kalshi tickers. DEC/FEB months use only hex-compatible letters (D,E,C and
-      // F,E,B), so a date like "26DEC2026" or "26FEB2026" produces a 9-char all-hex sequence
-      // that would incorrectly match at {8,}. Real UUID segments are ≥ 12 chars.
-      const HEX_SEGMENT_RE = /-[0-9a-f]{12,}/i;
-
-      // Political series-ticker prefixes — these markets are always valid and have
-      // public Kalshi pages even when their event_ticker contains a hex-like segment
-      // (some KXUSGOV* and KXUSHOUSE* event tickers include short hash suffixes).
-      // Markets whose seriesTicker starts with one of these prefixes bypass the hex
-      // rejection rules entirely.
-      const POLITICAL_SERIES_PREFIXES = [
-        'KXUSSENATE', 'KXUSHOUSE', 'KXUSGOV', 'PRES', 'POTUS',
-      ];
-      const rawCount = data.markets.length;
-
-      // Cross-category/multi-leg internal markets — ticker prefix check.
-      // HEX_SEGMENT_RE alone misses formats like KXMVECROSSCATEGORY-S202696CC1DA4643
-      // because "S" is not a hex character and breaks the consecutive-hex match.
-      // This explicit prefix RE catches them regardless of the UUID format Kalshi uses.
-      const CROSS_CATEGORY_PREFIX_RE = /^KXMVE?CROSS/i;
-
-      // Rejection counters — logged once per page so we can diagnose filter drift
-      let rejShort = 0, rejTicker = 0, rejHexEvent = 0, rejHexTicker = 0, rejCrossCategory = 0;
-
-      const markets = data.markets
-        .map(parseMarket)
-        .filter((m: KalshiMarket) => {
-          if (!m.title || m.title.length < 10) { rejShort++; return false; }
-          if (TICKER_RE.test(m.title)) { rejTicker++; return false; }
-
-          // Political series markets are always valid — they have public Kalshi
-          // pages and real liquidity even when their event_ticker carries a
-          // short hash suffix. Bypass both hex checks for these markets.
-          const seriesUpper = (m.seriesTicker || '').toUpperCase();
-          const isPolitical = POLITICAL_SERIES_PREFIXES.some(p => seriesUpper.startsWith(p));
-          if (isPolitical) return true;
-
-          // Explicit cross-category prefix check (catches S-prefixed UUID formats
-          // that HEX_SEGMENT_RE misses because S is not a hex digit)
-          if (
-            CROSS_CATEGORY_PREFIX_RE.test(m.seriesTicker || '') ||
-            CROSS_CATEGORY_PREFIX_RE.test(m.eventTicker   || '') ||
-            CROSS_CATEGORY_PREFIX_RE.test(m.ticker        || '')
-          ) { rejCrossCategory++; return false; }
-
-          // Exclude internal cross-category markets (no public Kalshi URLs)
-          if (m.eventTicker && HEX_SEGMENT_RE.test(m.eventTicker)) { rejHexEvent++; return false; }
-          if (m.ticker && HEX_SEGMENT_RE.test(m.ticker)) { rejHexTicker++; return false; }
-          return true;
-        });
-
-      if (markets.length < rawCount) {
-        console.log(
-          `[KALSHI] Quality filter: ${rawCount} raw → ${markets.length} kept` +
-          ` (short/empty:${rejShort} ticker-title:${rejTicker} cross-category:${rejCrossCategory} hex-event:${rejHexEvent} hex-ticker:${rejHexTicker})`
-        );
-        // Log a sample of the first rejected market so drift is immediately diagnosable
-        if (markets.length === 0 && data.markets.length > 0) {
-          const sample = data.markets[0];
-          console.log(`[KALSHI] Sample rejected market — ticker:"${sample.ticker}" title:"${sample.title}" event_ticker:"${sample.event_ticker}"`);
-        }
-      }
-
-      _kalshiLastFetchHadError = false; // successful 200 response
-      const cursor = data.cursor && data.cursor !== '' ? data.cursor : null;
-      return { markets, cursor };
-    } catch (err) {
-      const host = new URL(url).hostname;
-      const cause = (err as any)?.cause;
-      const errCode = cause?.code ?? '';
-      console.warn(`[KALSHI] ${host} failed: ${(err as Error).message}${cause ? ` (${errCode || cause.message || cause})` : ''}`);
-      lastError = err as Error;
-      // DNS failure: both URLs resolve in the same environment — skip fallback immediately
-      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN') break;
-      continue; // try fallback URL
-    }
-  }
-
-  throw lastError ?? new Error('All Kalshi endpoints failed');
-}
-
-/**
- * Fetch active markets from Kalshi.
- *
- * Supports keyword title searches:
- * - 'election' → election markets
- * - 'politics' → political markets
- * - 'NFL', 'NBA', 'MLB', 'NHL' → sport markets
- */
+/** Returns a flat slice of the market pool. */
 export async function fetchKalshiMarkets(params?: {
   category?: string;
   status?: 'open' | 'closed';
@@ -635,141 +405,11 @@ export async function fetchKalshiMarkets(params?: {
   useCache?: boolean;
   cacheTtlMs?: number;
 }): Promise<KalshiMarket[]> {
-  const { category, status = 'open', limit = 200, search, cursor, useCache = true, cacheTtlMs = 60000 } = params || {};
-  // Since the Kalshi API no longer receives category/search as URL params (title param removed),
-  // all non-paginated open-market fetches return identical results. Use a shared cache key
-  // so fetchSportsMarkets' 12 calls all hit the same entry after the first, preventing
-  // 12 identical API requests per invocation → rate limiting → circuit breaker opening.
-  const cacheKey = cursor ? getCacheKey({ category, status, search }) : getCacheKey({ status });
-
-  // Check cache first (only when not mid-pagination)
-  if (useCache && !cursor) {
-    const cached = getCachedMarkets(cacheKey, limit);
-    if (cached) {
-      return cached;
-    }
-
-    console.log('[KALSHI] Cache miss, fetching from API...');
-
-    // Coalesce: if an identical request is already in-flight, await that promise
-    const pending = pendingRequests.get(cacheKey);
-    if (pending) {
-      console.log('[KALSHI] Request already in-flight, coalescing:', cacheKey);
-      return pending.catch((err: unknown) => { pendingRequests.delete(cacheKey); throw err; });
-    }
-  }
-
-  const doFetch = async (): Promise<KalshiMarket[]> => {
-    try {
-      const queryParams = new URLSearchParams({
-        limit: Math.min(limit, 1000).toString(),
-        status,
-      });
-
-      // NOTE: The Kalshi v2 API does NOT support 'category', 'title', or 'search'
-      // query parameters — they are silently ignored. All filtering is client-side.
-      if (cursor) {
-        queryParams.append('cursor', cursor);
-      }
-
-      console.log('[KALSHI] Fetching markets — status:', status, 'limit:', Math.min(limit, 1000), cursor ? '(paginating)' : '(page 1)');
-
-      const { markets: meaningfulMarkets } = await fetchKalshiPage(queryParams);
-
-      console.log(`[KALSHI] Fetched ${meaningfulMarkets.length} meaningful markets`);
-
-      if (useCache && !cursor && meaningfulMarkets.length > 0) {
-        cacheMarkets(cacheKey, meaningfulMarkets, cacheTtlMs);
-      }
-
-      return meaningfulMarkets;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      const cause = (err as any).cause;
-      if (err.name === 'AbortError') {
-        console.error('[KALSHI] ❌ Request timeout after 15s');
-      } else {
-        console.error(`[KALSHI] ❌ Failed to fetch markets: ${err.message}${cause ? ` (cause: ${cause.code ?? cause.message ?? cause})` : ''}`);
-      }
-      _kalshiLastFetchHadError = true; // signal that [] is due to an error, not an empty API response
-      return [];
-    } finally {
-      pendingRequests.delete(cacheKey);
-    }
-  };
-
-  const fetchPromise = doFetch();
-  if (useCache && !cursor) {
-    pendingRequests.set(cacheKey, fetchPromise);
-  }
-  return fetchPromise;
+  const pool = await getMarketPool();
+  return pool.slice(0, params?.limit ?? 200);
 }
 
-/**
- * Fetch ALL open Kalshi markets across every category using cursor-based pagination.
- * Pages through until the API signals done or maxMarkets is reached.
- * Default cap: 2000 markets.
- */
-export async function fetchAllKalshiMarkets(options?: {
-  maxMarkets?: number;
-  status?: 'open' | 'closed';
-  useCache?: boolean;
-}): Promise<KalshiMarket[]> {
-  const { maxMarkets = 2000, status = 'open', useCache = true } = options || {};
-
-  const cacheKey = `kalshi:all:${status}:${maxMarkets}`;
-  if (useCache) {
-    const cached = getCachedMarkets(cacheKey);
-    if (cached) {
-      console.log(`[KALSHI] All-markets cache hit: ${cached.length} markets`);
-      return cached;
-    }
-  }
-
-  console.log(`[KALSHI] Fetching ALL markets (cap: ${maxMarkets})...`);
-
-  const all: KalshiMarket[] = [];
-  const seen = new Set<string>();
-  let cursor: string | null = null;
-  let page = 0;
-
-  do {
-    page++;
-    const queryParams = new URLSearchParams({ limit: '1000', status });
-    if (cursor) queryParams.append('cursor', cursor);
-
-    try {
-      const { markets, cursor: nextCursor } = await fetchKalshiPage(queryParams);
-
-      for (const m of markets) {
-        if (!seen.has(m.ticker)) {
-          seen.add(m.ticker);
-          all.push(m);
-        }
-      }
-
-      cursor = nextCursor;
-      console.log(`[KALSHI] Page ${page}: +${markets.length} (total: ${all.length}), more: ${cursor ? 'yes' : 'no'}`);
-    } catch (err) {
-      console.error(`[KALSHI] Pagination error on page ${page}:`, err instanceof Error ? err.message : err);
-      break;
-    }
-  } while (cursor && all.length < maxMarkets);
-
-  const categories = [...new Set(all.map(m => m.category))].filter(Boolean);
-  console.log(`[KALSHI] Done — ${all.length} markets, ${categories.length} categories: ${categories.slice(0, 15).join(', ')}`);
-
-  if (useCache && all.length > 0) {
-    cacheMarkets(cacheKey, all, 120000); // 2-min cache for full fetch
-  }
-
-  return all;
-}
-
-/**
- * Fetch Kalshi markets with retry logic and exponential backoff.
- * For fetching all markets, prefer fetchAllKalshiMarkets() instead.
- */
+/** Retries the pool fetch up to maxRetries times on network/API errors. */
 export async function fetchKalshiMarketsWithRetry(params?: {
   category?: string;
   status?: 'open' | 'closed';
@@ -777,497 +417,180 @@ export async function fetchKalshiMarketsWithRetry(params?: {
   search?: string;
   maxRetries?: number;
 }): Promise<KalshiMarket[]> {
-  const { maxRetries = 3, ...fetchParams } = params || {};
+  const limit   = params?.limit ?? 200;
+  const retries = params?.maxRetries ?? 3;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[KALSHI] Attempt ${attempt}/${maxRetries}`);
-      const markets = await fetchKalshiMarkets(fetchParams);
-
-      if (markets.length > 0) {
-        console.log(`[KALSHI] ✓ Success on attempt ${attempt}`);
-        return markets;
-      }
-
-      // If the inner fetch succeeded (200 OK) but returned 0 markets, that is a
-      // legitimate empty response — retrying won't change the result.
-      if (!_kalshiLastFetchHadError) {
-        console.log('[KALSHI] API returned 0 markets (empty response, not an error) — skipping retries');
-        return [];
-      }
-
-      // Inner fetch had a network/API error (returned [] due to caught exception).
-      // Retry with exponential back-off.
-      if (attempt < maxRetries) {
-        const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`[KALSHI] Fetch error yielded 0 markets, retrying in ${backoffMs}ms... (${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, backoffMs));
-      } else {
-        console.warn(`[KALSHI] All ${maxRetries} retry attempts exhausted — Kalshi markets unavailable`);
-        return [];
-      }
-    } catch (error) {
-      console.error(`[KALSHI] Attempt ${attempt} failed:`, error);
-
-      // Permanent failures won't succeed on retry — abort immediately
-      const msg = error instanceof Error ? error.message : String(error);
-      const cause = (error as any)?.cause;
-      const errCode = cause?.code ?? '';
-      if (msg.includes('401') || msg.includes('Unauthorized')) {
-        console.error('[KALSHI] Auth failure (401) — aborting retries');
-        return [];
-      }
-      // Any 4xx that isn't a rate limit is a permanent client error (bad params, forbidden, etc.)
-      // Retrying will never fix these — abort immediately.
-      const httpStatus = msg.match(/API error: (\d{3})/)?.[1];
-      if (httpStatus) {
-        const status = parseInt(httpStatus, 10);
-        if (status >= 400 && status < 500 && status !== 429) {
-          console.error(`[KALSHI] Permanent HTTP ${status} — aborting retries`);
-          return [];
-        }
-      }
-      if (errCode === 'ENOTFOUND' || errCode === 'EAI_AGAIN' || msg.includes('ENOTFOUND')) {
-        console.error('[KALSHI] DNS failure (ENOTFOUND) — aborting retries');
-        return [];
-      }
-
-      if (attempt < maxRetries) {
-        const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`[KALSHI] Retrying in ${backoffMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, backoffMs));
-      } else {
-        console.error('[KALSHI] All retry attempts failed');
-        return [];
-      }
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const markets = await getMarketPool().catch(() => [] as KalshiMarket[]);
+    if (markets.length > 0) return markets.slice(0, limit);
+    if (!_lastFetchHadError) return []; // empty API response, retrying won't help
+    if (attempt < retries) {
+      await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** (attempt - 1), 5000)));
     }
   }
-
   return [];
 }
 
-/**
- * Fetch sports-related markets from Kalshi.
- * Searches across all supported sports using keyword title searches, deduplicated by ticker.
- */
+/** Fetch all open markets up to maxMarkets (alias for pool). */
+export async function fetchAllKalshiMarkets(options?: {
+  maxMarkets?: number;
+  status?: 'open' | 'closed';
+  useCache?: boolean;
+}): Promise<KalshiMarket[]> {
+  return getMarketPool(options?.maxMarkets ?? 2000);
+}
+
 export async function fetchSportsMarkets(): Promise<KalshiMarket[]> {
-  // Single fetch + client-side filter. The Kalshi v2 API silently ignores the
-  // `search` query param, so the previous 12-keyword loop produced 12 identical
-  // pages joined by an in-memory dedup. Result: 4 batched API calls × 600ms
-  // delay = ~2.4s wasted per cold cache. The new path issues exactly one
-  // paginated call (`fetchAllKalshiMarkets`, capped at 1000 markets) and filters
-  // client-side via `isSportsMarket()` (seriesTicker prefix + category check).
-  console.log('[KALSHI] Fetching sports markets via single paginated call + client-side filter');
-
-  const allMarkets = await fetchAllKalshiMarkets({
-    maxMarkets: 1000,
-    status: 'open',
-    useCache: true,
-  });
-
-  const sportsMarkets = allMarkets.filter(isSportsMarket);
-
-  console.log(
-    `[KALSHI] Sports markets: ${sportsMarkets.length}/${allMarkets.length} after filter ` +
-    `(seriesTicker prefix or category match)`,
-  );
-  return sportsMarkets;
+  const pool   = await getMarketPool();
+  const sports = pool.filter(isSportsMarket);
+  console.log(`[KALSHI] Sports: ${sports.length}/${pool.length}`);
+  return sports;
 }
 
 /**
- * Fetch political / election markets from Kalshi using exact series_ticker
- * filtering.
- *
- * Strategy (in order of reliability):
- *  1. PRIMARY — query /markets?series_ticker=<X>&status=open for each
- *     known political series prefix (KXUSSENATE, KXUSHOUSE, KXUSGOV, PRES,
- *     POTUS). This is exact, not keyword-based, so results are deterministic
- *     and not susceptible to the Kalshi title-search non-determinism bug.
- *  2. FALLBACK — if all series queries return 0 results (possible when the
- *     Kalshi API does not support the series_ticker param on this deployment),
- *     fall back to keyword title searches using terms that are specific to
- *     political markets (e.g. "senate", "house representatives", "governor").
- *  3. BROAD FALLBACK — if both targeted paths yield 0 results, fetch a broad
- *     open-markets page and apply the `isElectionMarket` filter client-side.
- *
- * The `isElectionMarket` guard accepts any market whose `category` was already
- * normalised to 'Politics' by normalizeCategoryLabel (which maps all known
- * political series prefixes → 'Politics') OR whose title/subtitle contains a
- * canonical political keyword.
- *
- * @param options.year   - Filter results to this election year (default: 2026)
- * @param options.limit  - Maximum markets to return (default: 20)
+ * Fetch political / election markets.
+ * Tries direct series_ticker queries first (exact, no false positives),
+ * then falls back to client-side filtering of the shared pool.
  */
-export async function fetchElectionMarkets(options?: {
-  year?: number;
-  limit?: number;
-}): Promise<KalshiMarket[]> {
-  const { year = 2026, limit = 20 } = options || {};
+export async function fetchElectionMarkets(options?: { year?: number; limit?: number }): Promise<KalshiMarket[]> {
+  const limit    = options?.limit ?? 20;
+  const cacheKey = `kalshi:politics:${limit}`;
+  const cached   = cacheGet(cacheKey);
+  if (cached) return cached;
 
-  console.log('[KALSHI] fetchElectionMarkets — year:', year, 'limit:', limit);
-
-  // ── Canonical political series tickers ──────────────────────────────────
-  // These are the definitive Kalshi series IDs for US political markets.
-  // Add new entries here when Kalshi introduces new political series (e.g.
-  // KXUSLOCAL for state/local races).
-  const POLITICAL_SERIES: string[] = [
-    'KXUSSENATE',
-    'KXUSHOUSE',
-    'KXUSGOV',
-    'PRES',
-    'POTUS',
-  ];
-
-  // ── Election keyword list for secondary/fallback path ───────────────────
-  // Intentionally shorter than the old list to minimise extraneous matches.
-  // 'ballot', '2024', '2028' are omitted — too broad and produce false hits.
-  const ELECTION_KEYWORDS = [
-    'election', 'senate', 'house', 'congress', 'midterm',
-    'governor', 'president', 'republican', 'democrat',
-    'primary', 'gop', 'ballot initiative',
-  ];
-
-  function isElectionMarket(market: KalshiMarket): boolean {
-    // normalizeCategoryLabel maps KXUSSENATE*, KXUSHOUSE*, KXUSGOV*, PRES,
-    // POTUS → 'Politics'. Accept those directly without keyword scanning.
-    if (market.category === 'Politics') return true;
-    const text = `${market.title} ${market.subtitle}`.toLowerCase();
-    return ELECTION_KEYWORDS.some(k => text.includes(k));
-  }
-
-  const seen = new Set<string>();
-  const electionMarkets: KalshiMarket[] = [];
-
-  // ── Strategy 1: series_ticker exact queries (primary path) ─────────────
-  // Run all series queries in parallel to minimise latency. Each call goes
-  // through the shared circuit-breaker so it benefits from the same fault
-  // tolerance as the main fetchKalshiMarkets path.
-  console.log('[KALSHI] fetchElectionMarkets — trying series_ticker queries:', POLITICAL_SERIES);
-
+  // Strategy 1: direct series_ticker queries (the only query param Kalshi actually honours)
   const seriesResults = await Promise.allSettled(
     POLITICAL_SERIES.map(series =>
-      fetchKalshiPage(new URLSearchParams({
-        series_ticker: series,
-        status: 'open',
-        limit: String(Math.min(limit * 4, 200)),
-      }))
+      fetchPage({ series_ticker: series, status: 'open', limit: String(Math.min(limit * 4, 200)) })
     )
   );
 
-  for (const result of seriesResults) {
-    if (result.status !== 'fulfilled') continue;
-    for (const market of result.value.markets) {
-      if (!seen.has(market.ticker)) {
-        seen.add(market.ticker);
-        electionMarkets.push(market);
-        if (electionMarkets.length >= limit) break;
-      }
+  const seen    = new Set<string>();
+  const results: KalshiMarket[] = [];
+  for (const r of seriesResults) {
+    if (r.status !== 'fulfilled') continue;
+    for (const m of r.value.markets) {
+      if (!seen.has(m.ticker)) { seen.add(m.ticker); results.push(m); }
+      if (results.length >= limit) break;
     }
-    if (electionMarkets.length >= limit) break;
+    if (results.length >= limit) break;
+  }
+  console.log(`[KALSHI] Politics (series_ticker): ${results.length}`);
+
+  // Strategy 2: client-side filter from pool (used when series_ticker param is unsupported
+  // by this endpoint version, which returns the generic top-N list for all series queries)
+  if (results.length === 0) {
+    const pool     = await getMarketPool();
+    const filtered = pool.filter(isPoliticsMarket);
+    console.log(`[KALSHI] Politics (pool filter): ${filtered.length}/${pool.length}`);
+    // No political markets open (off-season) — return top open markets so cards populate
+    const final = filtered.length > 0 ? filtered : pool.slice(0, limit);
+    cacheSet(cacheKey, final.slice(0, limit), 30_000);
+    return final.slice(0, limit);
   }
 
-  console.log(`[KALSHI] fetchElectionMarkets — series_ticker path yielded: ${electionMarkets.length} markets`);
-
-  // ── Strategy 2: keyword title searches (fallback) ──────────────────────
-  // Used when the series_ticker param is unrecognised by this Kalshi endpoint
-  // version and all series queries return the generic top-50 open markets.
-  if (electionMarkets.length === 0) {
-    console.log('[KALSHI] fetchElectionMarkets — series_ticker yielded 0, trying keyword fallback');
-
-    const keywordSearches = [
-      `senate ${year}`,
-      `house ${year}`,
-      `governor ${year}`,
-      'midterm',
-      'congress',
-    ];
-
-    for (const search of keywordSearches) {
-      if (electionMarkets.length >= limit) break;
-
-      const markets = await fetchKalshiMarkets({ search, limit: 50 });
-      for (const market of markets) {
-        if (seen.has(market.ticker)) continue;
-        seen.add(market.ticker);
-        if (isElectionMarket(market)) {
-          electionMarkets.push(market);
-        }
-      }
-
-      // Brief pause to stay within Kalshi's per-second rate limit
-      if (electionMarkets.length < limit) {
-        await new Promise(r => setTimeout(r, 200));
-      }
-    }
-
-    console.log(`[KALSHI] fetchElectionMarkets — keyword fallback yielded: ${electionMarkets.length} markets`);
-  }
-
-  // ── Strategy 3: broad fetch + client-side filter (last resort) ──────────
-  if (electionMarkets.length === 0) {
-    console.log('[KALSHI] fetchElectionMarkets — all targeted paths returned 0, broad-fetch fallback');
-    try {
-      const broad = await fetchKalshiMarketsWithRetry({ limit: 200, maxRetries: 2 });
-      for (const market of broad) {
-        if (!seen.has(market.ticker) && isElectionMarket(market)) {
-          electionMarkets.push(market);
-        }
-      }
-      // If no political markets are open (e.g. off-cycle, far from election day),
-      // return the top open markets so cards are always populated with real data.
-      if (electionMarkets.length === 0 && broad.length > 0) {
-        console.log('[KALSHI] fetchElectionMarkets — no political markets found — returning top open markets as fallback');
-        for (const market of broad) {
-          if (!seen.has(market.ticker)) {
-            electionMarkets.push(market);
-          }
-          if (electionMarkets.length >= limit) break;
-        }
-      }
-    } catch {
-      // Non-critical — surface the empty array to the caller
-    }
-  }
-
-  console.log(`[KALSHI] fetchElectionMarkets — final count: ${electionMarkets.length} for ${year}`);
-  return electionMarkets.slice(0, limit);
+  cacheSet(cacheKey, results, 30_000);
+  return results;
 }
 
-/**
- * Fetch weather-related markets from Kalshi
- */
-export async function fetchWeatherMarkets(limit: number = 50): Promise<KalshiMarket[]> {
-  // Trimmed to 3 broad terms to avoid Kalshi rate limits (previously 9 terms → 429 errors).
-  const weatherSearches = ['weather', 'temperature', 'climate'];
-  const WEATHER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export async function fetchWeatherMarkets(limit = 50): Promise<KalshiMarket[]> {
+  const pool    = await getMarketPool();
+  const weather = pool.filter(isWeatherMarket);
+  console.log(`[KALSHI] Weather: ${weather.length}/${pool.length}`);
+  return weather.slice(0, limit);
+}
 
-  const seen = new Set<string>();
-  const all: KalshiMarket[] = [];
+export async function fetchFinanceMarkets(limit = 50): Promise<KalshiMarket[]> {
+  const pool    = await getMarketPool();
+  const finance = pool.filter(isFinanceMarket);
+  console.log(`[KALSHI] Finance: ${finance.length}/${pool.length}`);
+  return finance.slice(0, limit);
+}
 
-  console.log('[KALSHI] Fetching weather markets...');
+export async function fetchEntertainmentMarkets(limit = 20): Promise<KalshiMarket[]> {
+  const pool = await getMarketPool();
+  const ent  = pool.filter(isEntertainmentMarket);
+  console.log(`[KALSHI] Entertainment: ${ent.length}/${pool.length}`);
+  return ent.slice(0, limit);
+}
 
-  const results = await Promise.allSettled(
-    weatherSearches.map(search =>
-      fetchKalshiMarkets({ search, limit: 50, useCache: true, cacheTtlMs: WEATHER_CACHE_TTL_MS })
+export async function fetchTopMarketsByVolume(n = 10, _status: 'open' | 'closed' = 'open'): Promise<KalshiMarket[]> {
+  const pool = await getMarketPool();
+  return pool
+    .filter(m => !m.status || m.status === 'active' || m.status === 'open')
+    .sort((a, b) =>
+      (b.priceIsReal ? 1 : 0) - (a.priceIsReal ? 1 : 0) ||
+      (b.volume24h || b.volume) - (a.volume24h || a.volume)
     )
-  );
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      for (const market of result.value) {
-        if (!seen.has(market.ticker)) {
-          seen.add(market.ticker);
-          all.push(market);
-        }
-      }
-    }
-  }
-
-  console.log(`[KALSHI] Weather markets total: ${all.length}`);
-  return all.slice(0, limit);
+    .slice(0, n);
 }
 
-/**
- * Fetch finance/economics markets from Kalshi
- */
-export async function fetchFinanceMarkets(limit: number = 50): Promise<KalshiMarket[]> {
-  const financeSearches = [
-    'stock', 'S&P', 'NASDAQ', 'bitcoin', 'ethereum', 'crypto',
-    'interest rate', 'federal reserve', 'inflation', 'GDP',
-    'recession', 'unemployment', 'economic', 'treasury',
-  ];
-
-  const seen = new Set<string>();
-  const all: KalshiMarket[] = [];
-
-  console.log('[KALSHI] Fetching finance markets...');
-
-  const batchSize = 5;
-  for (let i = 0; i < financeSearches.length; i += batchSize) {
-    const batch = financeSearches.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(search => fetchKalshiMarkets({ search, limit: 50, useCache: true }))
-    );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        for (const market of result.value) {
-          if (!seen.has(market.ticker)) {
-            seen.add(market.ticker);
-            all.push(market);
-          }
-        }
-      }
-    }
-  }
-
-  console.log(`[KALSHI] Finance markets total: ${all.length}`);
-  return all.slice(0, limit);
-}
-
-/**
- * Fetch entertainment / pop-culture prediction markets from Kalshi.
- * Uses client-side title filtering since the Kalshi API has no category param for entertainment.
- * First checks the top-1000 markets (shared cache), then pages through all markets if needed.
- */
-export async function fetchEntertainmentMarkets(limit: number = 20): Promise<KalshiMarket[]> {
-  const ENTERTAINMENT_KEYWORDS = [
-    'oscar', 'grammy', 'emmy', 'tony award', 'golden globe', 'bafta',
-    'box office', 'billboard', 'academy award', 'best picture', 'best actor',
-    'best actress', 'netflix', 'celebrity', 'cannes', 'award season',
-    'super bowl halftime', 'music award', 'film award', 'reality show',
-    'people\'s choice', 'mtv award', 'vma', 'ama award', 'country music award',
-  ];
-
-  function isEntertainmentMarket(m: KalshiMarket): boolean {
-    const text = `${m.title} ${m.subtitle ?? ''}`.toLowerCase();
-    return ENTERTAINMENT_KEYWORDS.some(kw => text.includes(kw));
-  }
-
-  // First: check top 1000 markets (uses shared in-memory cache — free if already warm)
-  const topMarkets = await fetchKalshiMarkets({ limit: 1000 });
-  const entertainment = topMarkets.filter(isEntertainmentMarket);
-
-  // Second: if thin results, do a full paginated fetch (up to 2000 markets)
-  if (entertainment.length < 3) {
-    console.log('[KALSHI] Entertainment: top-1000 returned few results, fetching all markets...');
-    const allMarkets = await fetchAllKalshiMarkets({ maxMarkets: 2000, useCache: true });
-    const seen = new Set(topMarkets.map(m => m.ticker));
-    for (const m of allMarkets) {
-      if (!seen.has(m.ticker) && isEntertainmentMarket(m)) {
-        entertainment.push(m);
-        seen.add(m.ticker);
-      }
-    }
-  }
-
-  console.log(`[KALSHI] Entertainment markets: ${entertainment.length} found`);
-  return entertainment.slice(0, limit);
-}
-
-/**
- * Fetch all markets across all categories. Returns categorized results.
- */
 export async function fetchAllCategoryMarkets(): Promise<Record<string, KalshiMarket[]>> {
-  console.log('[KALSHI] Fetching all category markets...');
-
-  const [sports, elections, weather, finance] = await Promise.allSettled([
-    fetchSportsMarkets(),
-    fetchElectionMarkets({ limit: 50 }),
-    fetchWeatherMarkets(),
-    fetchFinanceMarkets(),
-  ]);
-
-  const result: Record<string, KalshiMarket[]> = {
-    sports: sports.status === 'fulfilled' ? sports.value : [],
-    elections: elections.status === 'fulfilled' ? elections.value : [],
-    weather: weather.status === 'fulfilled' ? weather.value : [],
-    finance: finance.status === 'fulfilled' ? finance.value : [],
+  const pool = await getMarketPool();
+  return {
+    sports:    pool.filter(isSportsMarket),
+    elections: pool.filter(isPoliticsMarket),
+    weather:   pool.filter(isWeatherMarket),
+    finance:   pool.filter(isFinanceMarket),
   };
-
-  const total = Object.values(result).reduce((sum, arr) => sum + arr.length, 0);
-  console.log(`[KALSHI] All categories total: ${total} markets`);
-
-  return result;
 }
 
-/**
- * Get market by ticker
- */
+// ── Single Market / Orderbook / Trades / History ──────────────────────────────
+
 export async function getMarketByTicker(ticker: string): Promise<KalshiMarket | null> {
   try {
-    const marketUrl = `${KALSHI_TRADING_URL}/markets/${ticker}`;
-    const response = await fetch(marketUrl, {
-      headers: buildHeaders(marketUrl),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) throw new Error(`Kalshi API error: ${response.status}`);
-
-    const data = await response.json();
-    const m = data.market;
-
-    return parseMarket(m);
-  } catch (error) {
-    console.error(`[KALSHI] Failed to fetch market ${ticker}:`, error);
+    const data = await kalshiGet(`/markets/${encodeURIComponent(ticker)}`);
+    return parseMarket(data.market);
+  } catch (err) {
+    console.error(`[KALSHI] getMarketByTicker(${ticker}):`, err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-/**
- * Fetch the level-2 order book for a specific market.
- * Returns yes/no bids and asks at each price level.
- */
 export async function fetchMarketOrderbook(ticker: string): Promise<{
-  yesBids: Array<{ price: number; quantity: number }>;
-  yesAsks: Array<{ price: number; quantity: number }>;
-  noBids: Array<{ price: number; quantity: number }>;
-  noAsks: Array<{ price: number; quantity: number }>;
+  yesBids: { price: number; quantity: number }[];
+  yesAsks: { price: number; quantity: number }[];
+  noBids:  { price: number; quantity: number }[];
+  noAsks:  { price: number; quantity: number }[];
 } | null> {
   try {
-    const orderbookUrl = `${KALSHI_TRADING_URL}/markets/${ticker}/orderbook`;
-    const response = await fetch(orderbookUrl, {
-      headers: buildHeaders(orderbookUrl),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-
-    // Kalshi v2 returns orderbook_fp with dollar strings: [[price_str, qty_str], ...]
-    // Kalshi v1 returns orderbook with integer cents: [[price_int, qty_int], ...]
-    // The v2 orderbook only contains bids (no asks) — asks are derived from NO bids.
+    const data = await kalshiGet(`/markets/${encodeURIComponent(ticker)}/orderbook`);
     const obFp = data.orderbook_fp;
     const obV1 = data.orderbook || {};
 
     if (obFp) {
-      // v2 format: price is a dollar string, convert to cents integer
-      const toFpLevel = (arr: any[] = []) =>
+      const toLevel = (arr: any[] = []) =>
         arr.map((l: any) => ({
           price:    Math.round(parseFloat(l[0] ?? '0') * 100),
           quantity: Math.round(parseFloat(l[1] ?? '0')),
         })).filter(l => l.price > 0);
-
-      const yesBids = toFpLevel(obFp.yes_dollars || []);
-      const noBids  = toFpLevel(obFp.no_dollars  || []);
-      // In Kalshi's binary market: YES ask = 100 - best NO bid, NO ask = 100 - best YES bid
-      const yesAsks = noBids.map(l => ({ price: 100 - l.price, quantity: l.quantity }));
-      const noAsks  = yesBids.map(l => ({ price: 100 - l.price, quantity: l.quantity }));
-      return { yesBids, yesAsks, noBids, noAsks };
+      const yesBids = toLevel(obFp.yes_dollars || []);
+      const noBids  = toLevel(obFp.no_dollars  || []);
+      return {
+        yesBids,
+        yesAsks: noBids.map(l  => ({ price: 100 - l.price, quantity: l.quantity })),
+        noBids,
+        noAsks:  yesBids.map(l => ({ price: 100 - l.price, quantity: l.quantity })),
+      };
     }
 
-    // v1 fallback
-    const toV1Level = (arr: any[] = []) => arr.map((l: any) => ({ price: l[0] ?? 0, quantity: l[1] ?? 0 }));
+    const toV1 = (arr: any[] = []) => arr.map((l: any) => ({ price: l[0] ?? 0, quantity: l[1] ?? 0 }));
     return {
-      yesBids: toV1Level(obV1.yes),
-      yesAsks: toV1Level(obV1.yes_ask || []),
-      noBids:  toV1Level(obV1.no),
-      noAsks:  toV1Level(obV1.no_ask  || []),
+      yesBids: toV1(obV1.yes),
+      yesAsks: toV1(obV1.yes_ask || []),
+      noBids:  toV1(obV1.no),
+      noAsks:  toV1(obV1.no_ask  || []),
     };
   } catch {
     return null;
   }
 }
 
-/**
- * Fetch recent trades / candlestick-style price history for a market.
- * Returns an array of { ts, price, count } entries.
- */
-export async function fetchMarketTrades(
-  ticker: string,
-  limit: number = 100,
-): Promise<Array<{ ts: string; price: number; count: number }>> {
+export async function fetchMarketTrades(ticker: string, limit = 100): Promise<{ ts: string; price: number; count: number }[]> {
   try {
-    const params = new URLSearchParams({ limit: String(limit) });
-    const tradesUrl = `${KALSHI_TRADING_URL}/markets/${ticker}/trades?${params}`;
-    const response = await fetch(tradesUrl, {
-      headers: buildHeaders(tradesUrl),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const trades: any[] = data.trades || [];
-    return trades.map((t: any) => ({
-      ts: t.created_time || t.ts || '',
-      // v2 API: yes_price_dollars is a string like "0.5600"; v1: yes_price is integer cents
+    const data = await kalshiGet(`/markets/${encodeURIComponent(ticker)}/trades`, { limit: String(limit) });
+    return (data.trades || []).map((t: any) => ({
+      ts:    t.created_time || t.ts || '',
       price: parseCents(t.yes_price_dollars, t.yes_price ?? t.price ?? 0),
       count: t.count ?? 1,
     }));
@@ -1276,197 +599,116 @@ export async function fetchMarketTrades(
   }
 }
 
-/**
- * Fetch price history for a single market (yes_price over time).
- * Used by KalshiDetailModal to render the multi-series probability chart.
- */
-export async function fetchMarketHistory(
-  ticker: string,
-  limit = 100,
-): Promise<Array<{ ts: number; pct: number }>> {
+export async function fetchMarketHistory(ticker: string, limit = 100): Promise<{ ts: number; pct: number }[]> {
   try {
-    const url = `${KALSHI_TRADING_URL}/markets/${encodeURIComponent(ticker)}/history?limit=${limit}`;
-    const response = await fetch(url, {
-      headers: buildHeaders(url),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const entries: any[] = data.history ?? data.market_history ?? [];
-    return entries.map((h: any) => {
-      const rawPrice = h.yes_price ?? h.yes_price_dollars ?? h.price ?? '0.5';
-      const pct = typeof rawPrice === 'string'
-        ? Math.round(parseFloat(rawPrice) * 100)
-        : Math.round(rawPrice > 1 ? rawPrice : rawPrice * 100);
-      const ts = h.ts
-        ? new Date(h.ts).getTime()
-        : h.created_time
-        ? new Date(h.created_time).getTime()
+    const data    = await kalshiGet(`/markets/${encodeURIComponent(ticker)}/history`, { limit: String(limit) });
+    const entries = data.history ?? data.market_history ?? [];
+    return (entries as any[]).map(h => {
+      const raw = h.yes_price ?? h.yes_price_dollars ?? h.price ?? '0.5';
+      const pct = typeof raw === 'string'
+        ? Math.round(parseFloat(raw) * 100)
+        : Math.round(raw > 1 ? raw : raw * 100);
+      const ts  = h.ts ? new Date(h.ts).getTime()
+        : h.created_time ? new Date(h.created_time).getTime()
         : Date.now();
       return { ts, pct: Math.min(99, Math.max(1, pct)) };
-    }).filter(h => h.pct > 0);
+    }).filter((h: any) => h.pct > 0);
   } catch {
     return [];
   }
 }
 
-/**
- * Fetch Kalshi events (grouped market containers).
- * Events wrap multiple binary markets (e.g. "2026 Midterms" → many district markets).
- */
 export async function fetchKalshiEvents(params?: {
   status?: string;
   limit?: number;
-  search?: string;
   series_ticker?: string;
-}): Promise<Array<{ eventTicker: string; title: string; category: string; markets: number }>> {
+}): Promise<{ eventTicker: string; title: string; category: string; markets: number }[]> {
   try {
-    const qp = new URLSearchParams({ limit: String(params?.limit ?? 100) });
-    if (params?.status) qp.set('status', params.status);
-    if (params?.search) qp.set('title', params.search);
-    if (params?.series_ticker) qp.set('series_ticker', params.series_ticker);
-
-    const eventsUrl = `${KALSHI_TRADING_URL}/events?${qp}`;
-    const response = await fetch(eventsUrl, {
-      headers: buildHeaders(eventsUrl),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const events: any[] = data.events || [];
-    return events.map((e: any) => ({
+    const qp: Record<string, string> = { limit: String(params?.limit ?? 100) };
+    if (params?.status)        qp.status        = params.status;
+    if (params?.series_ticker) qp.series_ticker = params.series_ticker;
+    const data = await kalshiGet('/events', qp);
+    return (data.events || []).map((e: any) => ({
       eventTicker: e.event_ticker || e.ticker || '',
-      title: e.title || e.event_title || '',
-      category: e.category || e.series_ticker || '',
-      markets: e.markets?.length ?? e.num_markets ?? 0,
+      title:       e.title || e.event_title || '',
+      category:    e.category || e.series_ticker || '',
+      markets:     e.markets?.length ?? e.num_markets ?? 0,
     }));
   } catch {
     return [];
   }
 }
 
-/**
- * Return the top N Kalshi markets by volume (across all open markets).
- * Fetches a broader set and sorts client-side.
- */
-export async function fetchTopMarketsByVolume(
-  n: number = 10,
-  status: 'open' | 'closed' = 'open',
-): Promise<KalshiMarket[]> {
-  const markets = await fetchKalshiMarketsWithRetry({ status, limit: Math.max(n * 5, 200), maxRetries: 2 });
-  // Sort by price signal quality (real price first), then by volume.
-  // No volume-based gate — all active markets are eligible regardless of trading activity.
-  // When all markets have volume24h=0 (as Kalshi currently reports), the old withActivity
-  // filter would collapse to markets with bid/ask/lastPrice only; using status instead
-  // ensures the full sorted list is always returned.
-  const sorted = markets
-    .filter(m => !m.status || m.status === 'active' || m.status === 'open')
-    .sort((a, b) =>
-      ((b.priceIsReal ? 1 : 0) - (a.priceIsReal ? 1 : 0)) ||
-      ((b.volume24h || b.volume) - (a.volume24h || a.volume))
-    );
-  return sorted.slice(0, n);
+// ── Analysis ──────────────────────────────────────────────────────────────────
+
+export function analyzeKalshiVolatility(market: KalshiVolatilityInput, modelProbability: number): KalshiAnalysis {
+  const impliedProbability = market.yesPrice / 100;
+  const edge       = modelProbability - impliedProbability;
+  const spread     = market.spread ?? (market.noPrice - (100 - market.yesPrice));
+  const spreadPct  = market.yesPrice > 0 ? Math.abs(spread) / market.yesPrice : 1;
+  const isLiquid   = spreadPct < 0.1 && (market.volume24h ?? 0) > 1000;
+  const confidence = Math.max(0, Math.round(Math.min(100, Math.abs(edge) * 200) - (isLiquid ? 0 : 20)));
+  const signal: 'YES' | 'NO' | 'PASS' =
+    Math.abs(edge) < 0.03 || !isLiquid ? 'PASS' : edge > 0 ? 'YES' : 'NO';
+  const recommendation =
+    signal === 'PASS' ? `No edge — spread too wide or model close to market (edge: ${(edge * 100).toFixed(1)}¢)`
+    : signal === 'YES' ? `Buy YES — model (${(modelProbability * 100).toFixed(1)}%) > implied (${market.yesPrice}¢)`
+    : `Buy NO — model (${(modelProbability * 100).toFixed(1)}%) < implied (${market.yesPrice}¢)`;
+  return { ticker: market.ticker, title: market.title, impliedProbability, modelProbability, edge, signal, confidence, spreadPct, isLiquid, recommendation };
 }
 
-/**
- * Generate Kalshi market cards for display
- */
-export function generateKalshiCards(markets: KalshiMarket[]): any[] {
-  console.log('[KALSHI] Generating cards for', markets.length, 'markets');
-  return markets.slice(0, 6).map(m => kalshiMarketToCard(m));
-}
+// ── Card Formatting ───────────────────────────────────────────────────────────
 
-/**
- * Derive a gradient and icon label based on Kalshi market category
- */
 function kalshiCategoryMeta(category: string): { gradient: string; iconLabel: string } {
   const cat = (category || '').toLowerCase();
-  if (cat.includes('election') || cat.includes('politic') || cat.includes('senate') || cat.includes('president') || cat.includes('congress')) {
+  if (cat.includes('election') || cat.includes('politic') || cat.includes('senate') || cat.includes('president') || cat.includes('congress'))
     return { gradient: 'from-blue-600 to-indigo-700', iconLabel: 'election' };
-  }
-  if (cat.includes('nfl') || cat.includes('nba') || cat.includes('mlb') || cat.includes('nhl') || cat.includes('sport') || cat.includes('game') || cat.includes('ufc') || cat.includes('soccer') || cat.includes('golf') || cat.includes('tennis')) {
+  if (cat.includes('nfl') || cat.includes('nba') || cat.includes('mlb') || cat.includes('nhl') || cat.includes('sport') || cat.includes('ufc') || cat.includes('soccer') || cat.includes('golf') || cat.includes('tennis'))
     return { gradient: 'from-green-600 to-emerald-700', iconLabel: 'sports' };
-  }
-  if (cat.includes('weather') || cat.includes('temp') || cat.includes('hurricane') || cat.includes('tornado') || cat.includes('snow') || cat.includes('rain')) {
+  if (cat.includes('weather') || cat.includes('temp') || cat.includes('hurricane') || cat.includes('tornado') || cat.includes('snow') || cat.includes('rain'))
     return { gradient: 'from-sky-600 to-cyan-700', iconLabel: 'weather' };
-  }
-  if (cat.includes('stock') || cat.includes('crypto') || cat.includes('bitcoin') || cat.includes('rate') || cat.includes('inflation') || cat.includes('gdp') || cat.includes('nasdaq') || cat.includes('sp500') || cat.includes('fed')) {
+  if (cat.includes('stock') || cat.includes('crypto') || cat.includes('bitcoin') || cat.includes('rate') || cat.includes('inflation') || cat.includes('gdp') || cat.includes('nasdaq') || cat.includes('sp500') || cat.includes('fed'))
     return { gradient: 'from-amber-600 to-orange-700', iconLabel: 'finance' };
-  }
-  if (cat.includes('oscar') || cat.includes('grammy') || cat.includes('emmy') || cat.includes('award') || cat.includes('box office')) {
+  if (cat.includes('oscar') || cat.includes('grammy') || cat.includes('emmy') || cat.includes('award') || cat.includes('box office'))
     return { gradient: 'from-fuchsia-600 to-pink-700', iconLabel: 'entertainment' };
-  }
-  if (cat.includes('tech') || cat.includes('ai') || cat.includes('space') || cat.includes('nasa') || cat.includes('spacex')) {
-    return { gradient: 'from-violet-600 to-purple-700', iconLabel: 'tech' };
-  }
   return { gradient: 'from-purple-600 to-indigo-700', iconLabel: 'market' };
 }
 
-/**
- * Convert Kalshi market to insight card format (enhanced)
- */
 export function kalshiMarketToCard(
   market: KalshiMarket,
-  orderbook?: {
-    yesBids: Array<{ price: number; quantity: number }>;
-    yesAsks: Array<{ price: number; quantity: number }>;
-  } | null
+  orderbook?: { yesBids: { price: number; quantity: number }[]; yesAsks: { price: number; quantity: number }[] } | null,
 ): any {
-  const yesPct = Math.min(100, Math.max(0, market.yesPrice));  // 0-100 cents = 0-100%
-  const noPct = Math.min(100, Math.max(0, market.noPrice));
+  const yesPct = Math.min(100, Math.max(0, market.yesPrice));
+  const noPct  = Math.min(100, Math.max(0, market.noPrice));
   const { gradient, iconLabel } = kalshiCategoryMeta(market.category);
 
-  // Edge score: how far from 50/50 (0 = efficient, 100 = max edge)
-  const edgeScore = Math.round(Math.abs(yesPct - 50) * 2);
-
-  // Recommendation based on probability
   const signal =
-    yesPct >= 75 ? 'Strong YES signal'
-    : yesPct >= 60 ? 'Lean YES'
-    : yesPct <= 25 ? 'Strong NO signal'
-    : yesPct <= 40 ? 'Lean NO'
-    : 'Market is efficient (near 50/50)';
+    yesPct >= 75 ? 'Strong YES signal' : yesPct >= 60 ? 'Lean YES' :
+    yesPct <= 25 ? 'Strong NO signal'  : yesPct <= 40 ? 'Lean NO'  :
+    'Market is efficient (near 50/50)';
 
-  // Time to close
   let expiresLabel = '';
   if (market.closeTime) {
-    const ms = new Date(market.closeTime).getTime() - Date.now();
+    const ms   = new Date(market.closeTime).getTime() - Date.now();
     const days = Math.floor(ms / 86400000);
     expiresLabel = days > 1 ? `${days}d` : days === 1 ? '1d' : ms > 0 ? '<24h' : 'Closed';
   }
 
-  // Volume tier
-  const volumeTier =
-    market.volume >= 1_000_000 ? 'Deep'
-    : market.volume >= 100_000 ? 'Active'
-    : market.volume >= 10_000 ? 'Moderate'
-    : 'Thin';
-
-  // Expiry urgency for color coding
   const expiryUrgency = (() => {
     if (!market.closeTime) return 'none';
     const days = (new Date(market.closeTime).getTime() - Date.now()) / 86400000;
     return days < 1 ? 'critical' : days < 3 ? 'urgent' : days < 7 ? 'soon' : 'normal';
   })();
 
-  // Spread label
-  const spreadLabel =
-    market.spread <= 1 ? 'Tight' :
-    market.spread <= 4 ? 'Normal' : 'Wide';
+  const fmtVol = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000   ? `${(n / 1_000).toFixed(0)}K`
+    : n > 0        ? `${n}` : '—';
 
-  // Price change direction
-  const priceDirection =
-    market.priceChange > 0 ? 'up' :
-    market.priceChange < 0 ? 'down' : 'flat';
-
-  // Build synthetic price history for sparkline — Kalshi API has no tick history endpoint.
-  // Uses lastPrice + priceChange to construct a minimal directional trend line.
-  const syntheticTrades: Array<{ price: number }> | null = (() => {
+  const syntheticTrades = (() => {
     if (!market.priceIsReal || yesPct <= 0) return null;
-    const prev = market.lastPrice > 0
-      ? market.lastPrice
-      : Math.max(1, yesPct - (market.priceChange ?? 0));
-    if (prev === yesPct) return null; // flat — no meaningful line to show
+    const prev = Math.max(1, market.lastPrice > 0 ? market.lastPrice : yesPct - (market.priceChange ?? 0));
+    if (prev === yesPct) return null;
     return [
       { price: Math.max(1, Math.min(99, prev)) },
       { price: Math.max(1, Math.min(99, (prev + yesPct) / 2)) },
@@ -1485,157 +727,48 @@ export function kalshiMarketToCard(
       ticker: market.ticker,
       subtitle: market.subtitle,
       iconLabel,
-      // Raw numbers for gauge rendering
       yesPct,
       noPct,
-      edgeScore,
-      // Order book (bid/ask) raw values in cents 0-100
-      yesBid: market.yesBid,
-      yesAsk: market.yesAsk,
-      noBid: market.noBid,
-      noAsk: market.noAsk,
+      edgeScore: Math.round(Math.abs(yesPct - 50) * 2),
+      yesBid: market.yesBid,   yesAsk: market.yesAsk,
+      noBid:  market.noBid,    noAsk:  market.noAsk,
       spread: market.spread,
-      spreadLabel,
-      // Price movement
+      spreadLabel: market.spread <= 1 ? 'Tight' : market.spread <= 4 ? 'Normal' : 'Wide',
       lastPrice: market.lastPrice,
       priceChange: market.priceChange,
-      priceDirection,
-      // Formatted display strings — volumes are in contracts, not dollars, so no $ prefix
+      priceDirection: market.priceChange > 0 ? 'up' : market.priceChange < 0 ? 'down' : 'flat',
       yesPrice: `${yesPct}¢`,
-      noPrice: `${noPct}¢`,
+      noPrice:  `${noPct}¢`,
       impliedProbability: `${yesPct.toFixed(1)}%`,
-      volume: market.volume >= 1_000_000
-        ? `${(market.volume / 1_000_000).toFixed(1)}M`
-        : market.volume >= 1_000
-        ? `${(market.volume / 1_000).toFixed(0)}K`
-        : market.volume > 0 ? `${market.volume}` : '—',
-      volume24h: market.volume24h >= 1_000_000
-        ? `${(market.volume24h / 1_000_000).toFixed(1)}M`
-        : market.volume24h >= 1_000
-        ? `${(market.volume24h / 1_000).toFixed(0)}K`
-        : market.volume24h > 0 ? `${market.volume24h}` : '',
-      openInterest: market.openInterest >= 1_000_000
-        ? `${(market.openInterest / 1_000_000).toFixed(1)}M`
-        : market.openInterest >= 1_000
-        ? `${(market.openInterest / 1_000).toFixed(0)}K`
-        : market.openInterest > 0 ? `${market.openInterest}` : '—',
+      volume:       fmtVol(market.volume),
+      volume24h:    fmtVol(market.volume24h),
+      openInterest: fmtVol(market.openInterest),
       closeTime: market.closeTime
         ? new Date(market.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'TBD',
       expiresLabel,
       expiryUrgency,
-      volumeTier,
+      volumeTier: market.volume >= 1_000_000 ? 'Deep' : market.volume >= 100_000 ? 'Active' : market.volume >= 10_000 ? 'Moderate' : 'Thin',
       isHot: market.volume24h >= 50_000 || market.volume >= 500_000,
       recommendation: signal,
-      // Event/series metadata — used for deep links and related markets
-      eventTicker: market.eventTicker,
+      eventTicker:  market.eventTicker,
       seriesTicker: market.seriesTicker,
-      // Raw close time ISO string — used by card for time-remaining progress bar
       closeTimeIso: market.closeTime || null,
-      // Raw volume numbers (contracts) — used for "X contracts" display
-      volumeRaw: market.volume,
-      volume24hRaw: market.volume24h,
-      openInterestRaw: market.openInterest,
-      // Level 2 orderbook depth (null when not fetched)
+      volumeRaw:        market.volume,
+      volume24hRaw:     market.volume24h,
+      openInterestRaw:  market.openInterest,
       orderbookBids: orderbook?.yesBids?.slice(0, 5) ?? null,
       orderbookAsks: orderbook?.yesAsks?.slice(0, 5) ?? null,
-      // Whether the market has any real price signal (vs defaulted 50¢)
-      priceIsReal: market.priceIsReal ?? false,
-      // Synthetic price history for sparkline (3-point trend from lastPrice → yesPct)
+      priceIsReal: market.priceIsReal,
       trades: syntheticTrades,
     },
-    status: (market.status === 'open' || market.status === 'active') ? 'active' : 'closed',
+    status:   market.status === 'open' || market.status === 'active' ? 'active' : 'closed',
     realData: true,
   };
 }
 
-// ============================================================================
-// Kalshi Volatility Analysis
-// ============================================================================
+// ── DB Fallback ───────────────────────────────────────────────────────────────
 
-export interface KalshiVolatilityInput {
-  ticker: string;
-  title: string;
-  yesPrice: number;     // Current yes price (0–100 cents)
-  noPrice: number;      // Current no price (0–100 cents)
-  volume24h?: number;
-  spread?: number;
-  priceChange?: number;
-  closeTime?: string;
-}
-
-export interface KalshiAnalysis {
-  ticker: string;
-  title: string;
-  impliedProbability: number;   // yesPrice / 100
-  modelProbability: number;     // Provided by caller
-  edge: number;                 // modelProbability - impliedProbability
-  signal: 'YES' | 'NO' | 'PASS';
-  confidence: number;           // 0–100
-  spreadPct: number;            // spread as % of midpoint
-  isLiquid: boolean;
-  recommendation: string;
-}
-
-/**
- * Analyze a Kalshi prediction market for edge vs a model probability.
- * Returns a buy/pass signal and confidence score.
- */
-export function analyzeKalshiVolatility(
-  market: KalshiVolatilityInput,
-  modelProbability: number,
-): KalshiAnalysis {
-  const impliedProbability = market.yesPrice / 100;
-  const edge = modelProbability - impliedProbability;
-
-  const spread = market.spread ?? (market.noPrice - (100 - market.yesPrice));
-  const midpoint = market.yesPrice;
-  const spreadPct = midpoint > 0 ? Math.abs(spread) / midpoint : 1;
-  const isLiquid = spreadPct < 0.1 && (market.volume24h ?? 0) > 1000;
-
-  // Confidence: penalize illiquid markets and small edges
-  const edgeConfidence = Math.min(100, Math.abs(edge) * 200);
-  const liquidityPenalty = isLiquid ? 0 : 20;
-  const confidence = Math.max(0, Math.round(edgeConfidence - liquidityPenalty));
-
-  let signal: 'YES' | 'NO' | 'PASS';
-  if (Math.abs(edge) < 0.03 || !isLiquid) {
-    signal = 'PASS';
-  } else if (edge > 0) {
-    signal = 'YES';
-  } else {
-    signal = 'NO';
-  }
-
-  const recommendation =
-    signal === 'PASS'
-      ? `No edge — spread too wide or model close to market (edge: ${(edge * 100).toFixed(1)}¢)`
-      : signal === 'YES'
-      ? `Buy YES — model (${(modelProbability * 100).toFixed(1)}%) > implied (${market.yesPrice}¢)`
-      : `Buy NO — model (${(modelProbability * 100).toFixed(1)}%) < implied (${market.yesPrice}¢)`;
-
-  return {
-    ticker: market.ticker,
-    title: market.title,
-    impliedProbability,
-    modelProbability,
-    edge,
-    signal,
-    confidence,
-    spreadPct,
-    isLiquid,
-    recommendation,
-  };
-}
-
-/**
- * Convert a row from the api.kalshi_markets Supabase table into a KalshiMarket.
- * Used as a fallback when the live Kalshi API is unavailable — the cron job
- * populates this table every 5 minutes so recent data is always available.
- *
- * DB yes_price / no_price are stored in the 0–1 decimal range; KalshiMarket
- * expects integer cents (0–100).
- */
 export function buildKalshiMarketFromDbRow(row: {
   market_id: string;
   title: string;
@@ -1674,11 +807,17 @@ export function buildKalshiMarketFromDbRow(row: {
   };
 }
 
-/**
- * Returns true if the most recent fetchKalshiMarkets call failed with a network or API error.
- * Returns false if the API responded with 200 OK (even if 0 markets were returned).
- * Used by cards-generator to distinguish "API down" from "legitimately no markets."
- */
+// ── Compat Shims ──────────────────────────────────────────────────────────────
+
+/** @deprecated Circuit breaker was removed. No-op kept for call-site compat. */
+export function resetKalshiCircuitBreaker(): void {}
+
+/** True when the last pool fetch failed with a network/API error (vs. empty but valid response). */
 export function wasKalshiFetchError(): boolean {
-  return _kalshiLastFetchHadError;
+  return _lastFetchHadError;
+}
+
+/** @deprecated Use kalshiMarketToCard() directly. */
+export function generateKalshiCards(markets: KalshiMarket[]): any[] {
+  return markets.slice(0, 6).map(m => kalshiMarketToCard(m));
 }

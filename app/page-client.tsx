@@ -175,7 +175,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     aiQuickActions, setAiQuickActions,
     lastUserQuery, setLastUserQuery,
     generateContextualSuggestions,
-  } = useSuggestedPrompts({ selectedCategory, selectedSport, initPromptsLoadedRef });
+  } = useSuggestedPrompts({ selectedCategory, selectedSport, selectedKalshiTopic, initPromptsLoadedRef });
 
   // ── File handling ─────────────────────────────────────────────────────────────
   const { uploadedFiles, fileInputRef, processFiles, handleFileUpload, removeAttachment, saveFileToProfile, setUploadedFiles } = useFileHandling();

@@ -23,8 +23,9 @@ type Prompt = { label: string; query: string };
 const BUCKET_MS   = 15 * 60 * 1_000; // 15-minute cache window
 const REDIS_TTL_S = 14 * 60;          // 14 min (slightly under bucket width)
 
-function redisKey(category: string, sport: string): string {
-  return `prompts:v1:${category}:${sport}:${bucket(BUCKET_MS)}`;
+function redisKey(category: string, sport: string, topic?: string): string {
+  const topicPart = topic ? `:${topic}` : '';
+  return `prompts:v1:${category}:${sport}${topicPart}:${bucket(BUCKET_MS)}`;
 }
 
 // ── In-request warm-lock (prevents duplicate background AI calls per instance) -
@@ -71,11 +72,13 @@ async function generateAIPrompts(
   category: string,
   sport: string,
   games: string[],
+  topic?: string,
 ): Promise<Prompt[] | null> {
   const today         = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const sportLabel    = sport ? sport.toUpperCase() : 'any sport';
-  const categoryLabel = category === 'all'  ? 'sports betting and fantasy'
-                      : category === 'dfs'  ? 'Daily Fantasy Sports (DFS)'
+  const categoryLabel = category === 'all'     ? 'sports betting and fantasy'
+                      : category === 'dfs'     ? 'Daily Fantasy Sports (DFS)'
+                      : category === 'kalshi'  ? `Kalshi prediction markets${topic ? ` (${topic} category)` : ''}`
                       : category;
   const scheduleText  = games.length > 0
     ? `Today's confirmed scheduled games:\n${games.map(g => `- ${g}`).join('\n')}`
@@ -87,11 +90,11 @@ async function generateAIPrompts(
       maxOutputTokens: 400,
       temperature:     0.7,
       system: `You generate quick-action prompt suggestions for a sports AI chat application called Leverage AI. Your suggestions must be specific, timely, and directly useful to bettors and fantasy players. Only reference teams and matchups from the provided game schedule — never invent or hallucinate matchups. If no schedule is provided, generate action-oriented prompts without specific team names. Return ONLY valid JSON with no markdown.`,
-      prompt: `Today is ${today}. The user is in the "${categoryLabel}" section${sport ? `, focused on ${sportLabel}` : ''}.
+      prompt: `Today is ${today}. The user is in the "${categoryLabel}" section${sport ? `, focused on ${sportLabel}` : ''}${topic ? `, browsing the "${topic}" topic` : ''}.
 
 ${scheduleText}
 
-Generate exactly 5 suggested questions that a serious sports bettor or fantasy player would want to ask right now. Make them specific and action-oriented.${games.length > 0 ? ' Reference specific games or teams from the schedule above where relevant.' : ''}
+Generate exactly 5 suggested questions that a serious sports bettor or fantasy player would want to ask right now. Make them specific and action-oriented.${games.length > 0 ? ' Reference specific games or teams from the schedule above where relevant.' : ''}${category === 'kalshi' ? ` Focus on Kalshi prediction market trading, pricing inefficiencies, and arbitrage opportunities${topic ? ` specifically in the ${topic} category` : ''}.` : ''}
 
 Return a JSON array of 5 objects: [{"label": "Short label (3-5 words)", "query": "Full question (1-2 sentences, specific and actionable)"}]`,
     });
@@ -109,14 +112,14 @@ Return a JSON array of 5 objects: [{"label": "Short label (3-5 words)", "query":
 
 // ── Background cache warm ─────────────────────────────────────────────────────
 
-async function warmCache(rKey: string, category: string, sport: string): Promise<void> {
+async function warmCache(rKey: string, category: string, sport: string, topic?: string): Promise<void> {
   if (_warming.has(rKey)) return;
   _warming.add(rKey);
   try {
     const apiKey = getGrokApiKey();
     if (!apiKey) return;
     const games  = await fetchTodaysGames(sport || category).catch(() => [] as string[]);
-    const result = await generateAIPrompts(apiKey, category, sport, games);
+    const result = await generateAIPrompts(apiKey, category, sport, games, topic);
     if (result?.length) {
       await cacheSet(rKey, result, REDIS_TTL_S);
       console.log(`[prompts] Warmed cache for ${rKey} (${result.length} prompts, ${games.length} games)`);
@@ -130,7 +133,94 @@ async function warmCache(rKey: string, category: string, sport: string): Promise
 
 // ── Static fallbacks ──────────────────────────────────────────────────────────
 
+const KALSHI_TOPIC_FALLBACKS: Record<string, Prompt[]> = {
+  Trending: [
+    { label: 'Best edge right now',    query: 'What trending Kalshi market has the best edge right now based on pricing inefficiency?' },
+    { label: '24h volume moves',       query: 'Show me the biggest volume moves on Kalshi in the last 24 hours and what is driving them' },
+    { label: 'Highest liquidity',      query: 'Which Kalshi contracts have the highest liquidity today and are they fairly priced?' },
+    { label: 'Cross-market arb',       query: 'Find cross-market arbitrage opportunities between trending Kalshi markets and sportsbooks' },
+    { label: 'Best value play',        query: 'What is the best value play on Kalshi right now based on market inefficiencies?' },
+  ],
+  Politics: [
+    { label: '2026 midterm value',     query: '2026 midterm election contracts on Kalshi — which Senate seats have the best pricing inefficiency?' },
+    { label: 'Senate seat edge',       query: 'Which Senate seat prediction markets on Kalshi are mispriced vs polling consensus right now?' },
+    { label: 'Governor race pricing',  query: 'Analyze governor race contract pricing on Kalshi — where is the best value?' },
+    { label: 'Political hedging',      query: 'Build a political market portfolio hedging strategy using Kalshi contracts for 2026 elections' },
+    { label: 'Best political edge',    query: 'Which political prediction markets on Kalshi have the biggest gap between market price and true probability?' },
+  ],
+  Sports: [
+    { label: 'Sports vs sportsbooks',  query: 'Compare Kalshi sports contracts to sportsbook odds — where are the biggest pricing discrepancies?' },
+    { label: 'Championship value',     query: 'Analyze championship winner contract pricing on Kalshi — which futures offer the best value?' },
+    { label: 'MVP award markets',      query: 'Which MVP award prediction markets on Kalshi are mispriced vs expert consensus?' },
+    { label: 'Sports arb plays',       query: 'Find arbitrage opportunities between Kalshi sports markets and DraftKings or FanDuel right now' },
+    { label: 'Best sports contract',   query: 'What is the highest-edge sports prediction market on Kalshi today?' },
+  ],
+  Crypto: [
+    { label: 'BTC milestone pricing',  query: 'Analyze Bitcoin price milestone contracts on Kalshi — are they fairly priced vs options market implied probability?' },
+    { label: 'ETF approval edge',      query: 'Are crypto ETF approval prediction markets on Kalshi mispriced vs regulatory timeline expectations?' },
+    { label: 'Crypto vs Kalshi arb',   query: 'Find arbitrage opportunities between crypto derivatives markets and Kalshi price milestone contracts' },
+    { label: 'Altcoin milestones',     query: 'Which altcoin milestone contracts on Kalshi offer the best value based on on-chain metrics?' },
+    { label: 'Best crypto contract',   query: 'What is the best-value crypto prediction market on Kalshi right now?' },
+  ],
+  Economics: [
+    { label: 'Fed rate edge',          query: 'Are Fed rate decision contracts on Kalshi fairly priced vs Fed funds futures?' },
+    { label: 'CPI market value',       query: 'Analyze CPI and inflation prediction market pricing on Kalshi vs economist consensus' },
+    { label: 'Jobs report contracts',  query: 'Which jobs report prediction markets on Kalshi offer the best trading edge this month?' },
+    { label: 'GDP market edge',        query: 'Where is the biggest mispricing in GDP and economic indicator prediction markets on Kalshi?' },
+    { label: 'Best macro contract',    query: 'What macroeconomic prediction market on Kalshi has the best edge right now?' },
+  ],
+  Financials: [
+    { label: 'S&P milestone value',    query: 'Are S&P 500 milestone contracts on Kalshi fairly priced vs options-implied probabilities?' },
+    { label: 'Rate vs Kalshi arb',     query: 'Compare interest rate futures pricing to Kalshi rate decision contracts — where is the arbitrage?' },
+    { label: 'Treasury yield edge',    query: 'Analyze treasury yield prediction market pricing on Kalshi vs bond market implied expectations' },
+    { label: 'Market milestone plays', query: 'Which stock market milestone contracts on Kalshi offer the best risk/reward right now?' },
+    { label: 'Best financial edge',    query: 'What is the highest-edge financial prediction market on Kalshi today?' },
+  ],
+  Climate: [
+    { label: 'Hurricane season edge',  query: 'Analyze hurricane season Kalshi contracts — are they fairly priced vs NOAA forecasts?' },
+    { label: 'Temperature vs NOAA',    query: 'Compare temperature record prediction markets on Kalshi to NOAA model forecasts — where is the edge?' },
+    { label: 'Climate event pricing',  query: 'Which climate event prediction markets on Kalshi are most mispriced vs scientific consensus?' },
+    { label: 'Best climate contract',  query: 'What is the best value climate prediction market on Kalshi this month?' },
+    { label: 'Weather market arb',     query: 'Find weather and climate Kalshi contracts that are mispriced vs prediction model consensus' },
+  ],
+  Companies: [
+    { label: 'Earnings edge',          query: 'Which earnings announcement prediction markets on Kalshi are mispriced vs options-implied move?' },
+    { label: 'M&A market value',       query: 'Analyze M&A announcement prediction markets on Kalshi — which deals are most mispriced?' },
+    { label: 'CEO departure pricing',  query: 'Are CEO departure prediction markets on Kalshi fairly priced based on recent corporate news?' },
+    { label: 'Company milestone edge', query: 'Which company milestone contracts on Kalshi offer the best value right now?' },
+    { label: 'Best company contract',  query: 'What is the highest-edge company event prediction market on Kalshi today?' },
+  ],
+  Mentions: [
+    { label: 'Social mention edge',    query: 'Which social media mention prediction markets on Kalshi are most mispriced right now?' },
+    { label: 'Celebrity brand value',  query: 'Analyze celebrity brand mention markets on Kalshi — where is the pricing inefficiency?' },
+    { label: 'News volume edge',       query: 'Are news volume prediction markets on Kalshi fairly priced vs current media coverage trends?' },
+    { label: 'Best mentions play',     query: 'What is the best value mentions prediction market on Kalshi right now?' },
+    { label: 'Viral event contracts',  query: 'Which viral event or trending topic contracts on Kalshi have the most edge?' },
+  ],
+  Culture: [
+    { label: 'Awards season value',    query: 'Are awards season contracts on Kalshi fairly priced vs critic consensus and box office data?' },
+    { label: 'Oscars edge',            query: 'Analyze Oscars and Grammy prediction markets on Kalshi — which categories are most mispriced?' },
+    { label: 'Celebrity event edge',   query: 'Which celebrity event prediction markets on Kalshi have the biggest pricing inefficiency right now?' },
+    { label: 'Entertainment portfolio',query: 'Build an entertainment prediction market portfolio strategy using Kalshi contracts' },
+    { label: 'Best culture contract',  query: 'What is the highest-edge culture and entertainment prediction market on Kalshi today?' },
+  ],
+  'Tech & Science': [
+    { label: 'AI milestone edge',      query: 'Are AI company milestone contracts on Kalshi fairly priced vs current AI progress benchmarks?' },
+    { label: 'Tech earnings value',    query: 'Which tech earnings prediction markets on Kalshi are most mispriced vs analyst estimates?' },
+    { label: 'Space launch pricing',   query: 'Analyze space launch success prediction markets on Kalshi vs historical success rates' },
+    { label: 'Science breakthrough',   query: 'Which scientific breakthrough prediction markets on Kalshi offer the best edge right now?' },
+    { label: 'Best tech contract',     query: 'What is the highest-edge tech and science prediction market on Kalshi today?' },
+  ],
+};
+
 const STATIC_FALLBACKS: Record<string, Prompt[]> = {
+  kalshi: [
+    { label: 'Best edge right now',    query: 'What Kalshi prediction market has the best pricing edge right now based on market inefficiency?' },
+    { label: 'Highest volume today',   query: 'Show me the highest volume Kalshi markets today and where the smart money is positioning' },
+    { label: 'Cross-market arb',       query: 'Find cross-market arbitrage opportunities between Kalshi prediction markets and sportsbooks' },
+    { label: 'Political markets',      query: 'Show me political prediction markets on Kalshi with the biggest gaps between market price and polling' },
+    { label: 'Sports vs odds',         query: 'Compare Kalshi sports contracts to sportsbook odds — where are the biggest pricing discrepancies?' },
+  ],
   betting: [
     { label: 'Best line value today',  query: 'Which games today have the best line value and where is sharp money pointing?' },
     { label: 'Fade public picks',       query: 'Which teams are heavily bet by the public but have weak value according to the closing line?' },
@@ -182,7 +272,9 @@ const STATIC_FALLBACKS: Record<string, Prompt[]> = {
   ],
 };
 
-function getStaticFallback(category: string, sport: string): Prompt[] {
+function getStaticFallback(category: string, sport: string, topic?: string): Prompt[] {
+  if (category === 'kalshi' && topic && KALSHI_TOPIC_FALLBACKS[topic]) return KALSHI_TOPIC_FALLBACKS[topic];
+  if (category === 'kalshi') return STATIC_FALLBACKS.kalshi;
   if (sport && STATIC_FALLBACKS[sport.toLowerCase()]) return STATIC_FALLBACKS[sport.toLowerCase()];
   if (STATIC_FALLBACKS[category]) return STATIC_FALLBACKS[category];
   return STATIC_FALLBACKS.betting;
@@ -194,14 +286,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const category = searchParams.get('category') || 'all';
   const sport    = searchParams.get('sport')    || '';
-  const rKey     = redisKey(category, sport);
+  const topic    = searchParams.get('topic')    || undefined;
+  const rKey     = redisKey(category, sport, topic);
 
   // ── Layer 1: Redis (shared across all instances) ───────────────────────────
   try {
     const hit = await cacheGet<Prompt[]>(rKey);
     if (hit?.length) {
       return NextResponse.json(
-        { success: true, prompts: hit, cached: true, source: 'redis' },
+        { success: true, prompts: hit, generated: true, cached: true, source: 'redis' },
         { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=840' } },
       );
     }
@@ -212,12 +305,13 @@ export async function GET(req: NextRequest) {
   // ── Layer 2 + 3: Return static immediately, warm Redis in background ───────
   // The first response on a cold cache is always instant (static fallback).
   // The background warm populates Redis so every subsequent request is fast.
-  void warmCache(rKey, category, sport);
+  void warmCache(rKey, category, sport, topic);
 
   return NextResponse.json({
-    success: true,
-    prompts: getStaticFallback(category, sport),
-    cached:  false,
-    source:  'static',
+    success:   true,
+    prompts:   getStaticFallback(category, sport, topic),
+    generated: false,
+    cached:    false,
+    source:    'static',
   });
 }

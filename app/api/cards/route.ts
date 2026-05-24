@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { sport: rawSport, category, limit = 6, userContext, draftGroupId, includeAllCards = false } = body;
+    const { sport: rawSport, category, topic, limit = 6, userContext, draftGroupId, includeAllCards = false } = body;
 
     // Infer sport from the user's query text when the caller hasn't provided one
     const sport = rawSport || (userContext ? detectSportFromText(String(userContext)) || undefined : undefined);
@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
 
     const maxCards = includeAllCards ? 50 : 25;
     const clampedLimit = Math.min(Math.max(Number(limit) || 6, 1), maxCards);
-    // Include userContext and draftGroupId in dedupeKey — different queries must not coalesce
+    // Include userContext, topic, and draftGroupId in dedupeKey — different queries must not coalesce
     // into one in-flight promise even if category/sport/limit match.
-    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${clampedLimit}::${userContext ?? ''}::${draftGroupId ?? ''}`;
+    const dedupeKey = `${category ?? ''}::${sport ?? ''}::${topic ?? ''}::${clampedLimit}::${userContext ?? ''}::${draftGroupId ?? ''}`;
 
     // Return the in-flight promise if an identical request is already running
     if (inflight.has(dedupeKey)) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     // 20s hard timeout — prevents this route from hanging until Vercel's 60s wall clock
     // if an upstream API (odds, weather, kalshi) is slow or unresponsive.
     const cardPromise = Promise.race([
-      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, undefined, { userContext: userContext ?? undefined, draftGroupId: typeof draftGroupId === 'number' ? draftGroupId : undefined }),
+      generateContextualCards(category ?? undefined, sport ?? undefined, clampedLimit, undefined, topic || undefined, { userContext: userContext ?? undefined, draftGroupId: typeof draftGroupId === 'number' ? draftGroupId : undefined }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('card generation timed out')), 20_000),
       ),

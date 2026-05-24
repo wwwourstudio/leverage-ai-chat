@@ -466,10 +466,10 @@ export function Sidebar({
             />
           </div>
 
-          {/* Category tabs */}
+          {/* Category grid */}
           <div>
-            <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Platform</div>
-            <div className="flex gap-1 flex-wrap">
+            <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-2 px-0.5">Platform</div>
+            <div className="grid grid-cols-2 gap-1.5">
               {categories.map(cat => {
                 const Icon = cat.icon;
                 const isActive = selectedCategory === cat.id;
@@ -479,32 +479,30 @@ export function Sidebar({
                     onClick={() => handleCategorySelect(cat.id)}
                     title={cat.desc}
                     className={cn(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 whitespace-nowrap border',
+                      'flex flex-col items-center gap-1 py-2.5 rounded-xl border text-center transition-all duration-200 last:col-span-2',
                       isActive
-                        ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color}`
-                        : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                        ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color} shadow-sm`
+                        : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] bg-[var(--bg-surface)]/30 hover:bg-[var(--bg-surface)] hover:text-[var(--text-muted)] hover:border-[var(--border-subtle)]',
                     )}
                   >
                     <Icon className={cn(
-                      'w-3 h-3 flex-shrink-0 transition-colors',
+                      'w-4 h-4 flex-shrink-0 transition-colors',
                       isActive ? cat.color : 'text-[var(--text-faint)]',
                     )} />
-                    <span>{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
+                    <span className="text-[10px] font-bold leading-none">{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
+                    <span className={cn(
+                      'text-[8px] leading-none',
+                      isActive ? 'opacity-70' : 'text-[var(--text-faint)] opacity-60',
+                    )}>{cat.desc}</span>
                   </button>
                 );
               })}
             </div>
 
-            {activeCategory && selectedCategory !== 'all' && (
-              <p className="text-[9px] text-[var(--text-faint)] px-0.5 mt-1 leading-tight">
-                {activeCategory.desc}
-              </p>
-            )}
-
             {/* Sport sub-filter (non-Kalshi) */}
             {selectedCategory !== 'kalshi' && (
-              <div className="relative mt-2">
-                <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Sport</div>
+              <div className="relative mt-2.5">
+                <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Sport</div>
                 <div className="relative">
                   <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
                   <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
@@ -542,26 +540,34 @@ export function Sidebar({
 
             {/* Kalshi topic sub-filter */}
             {selectedCategory === 'kalshi' && (
-              <div className="mt-2">
-                <div className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-1 px-0.5">Topic</div>
-                <div className="relative">
-                  <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
-                    {KALSHI_TOPICS.map(topic => (
-                      <button
-                        key={topic}
-                        onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
-                        className={cn(
-                          'px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
-                          selectedKalshiTopic === topic
-                            ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30'
-                            : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                        )}
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
+              <div className="mt-2.5">
+                <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Topic</div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSelectedKalshiTopic('')}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-full text-[9px] font-bold transition-all duration-200 border',
+                      selectedKalshiTopic === ''
+                        ? 'bg-cyan-600/25 text-cyan-300 border-cyan-500/40'
+                        : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                    )}
+                  >
+                    All
+                  </button>
+                  {KALSHI_TOPICS.map(topic => (
+                    <button
+                      key={topic}
+                      onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
+                      className={cn(
+                        'px-2.5 py-1.5 rounded-full text-[9px] font-bold transition-all duration-200 border',
+                        selectedKalshiTopic === topic
+                          ? 'bg-cyan-600/25 text-cyan-300 border-cyan-500/40'
+                          : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+                      )}
+                    >
+                      {topic}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

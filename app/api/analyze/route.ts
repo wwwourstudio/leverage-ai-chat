@@ -378,11 +378,11 @@ export async function POST(request: NextRequest) {
         if (hasPropCardIntent) {
           cardFetchPromise = generateContextualCards('props', sportKey, 7).catch(() => generateContextualCards('betting', sportKey, 7).catch(() => []));
         } else if (kalshiSportsFallbackMarkets?.length) {
-          cardFetchPromise = import('@/lib/kalshi/index')
-            .then(({ kalshiMarketToCard }) => {
-              const kalshiCards = kalshiSportsFallbackMarkets!.map((m: any) => kalshiMarketToCard(m));
-              console.log(`[KALSHI] Serving ${kalshiCards.length} prediction market cards (odds API fallback)`);
-              return kalshiCards as InsightCard[];
+          cardFetchPromise = import('@/lib/cards/kalshi-generator')
+            .then(({ kalshiMarketsToGroupedCard }) => {
+              const grouped = kalshiMarketsToGroupedCard(kalshiSportsFallbackMarkets!, 'sports');
+              console.log(`[KALSHI] Serving 1 grouped sports card (${kalshiSportsFallbackMarkets!.length} markets)`);
+              return [grouped] as InsightCard[];
             })
             .catch(() => generateContextualCards('betting', sportKey, 7).catch(() => []));
         } else {
@@ -391,11 +391,13 @@ export async function POST(request: NextRequest) {
         }
 
       } else if (context.isPoliticalMarket || context.selectedCategory === 'kalshi' || kalshiPromptMarkets?.length) {
-        cardFetchPromise = import('@/lib/kalshi/index')
-          .then(({ kalshiMarketToCard }) => {
-            const cards = kalshiPromptMarkets!.map((m: any) => kalshiMarketToCard(m));
-            console.log(`[KALSHI] Cards from prompt bridge: ${cards.length} markets`);
-            return cards as InsightCard[];
+        cardFetchPromise = import('@/lib/cards/kalshi-generator')
+          .then(({ kalshiMarketsToGroupedCard, inferKalshiSub }) => {
+            const markets = kalshiPromptMarkets ?? [];
+            const sub = context.kalshiSubcategory || inferKalshiSub(userMessage.toLowerCase()) || 'trending';
+            const grouped = kalshiMarketsToGroupedCard(markets, sub);
+            console.log(`[KALSHI] Cards from prompt bridge: 1 grouped ${sub} card (${markets.length} markets)`);
+            return [grouped] as InsightCard[];
           })
           .catch(() => generateContextualCards('kalshi', context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []));
       } else {

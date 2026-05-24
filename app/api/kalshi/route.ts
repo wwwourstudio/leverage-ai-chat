@@ -10,6 +10,7 @@ import {
   fetchTopMarketsByVolume,
   fetchMarketOrderbook,
   fetchMarketTrades,
+  fetchMarketHistory,
   fetchKalshiEvents,
   getMarketByTicker,
   kalshiMarketToCard,
@@ -114,6 +115,12 @@ export async function GET(request: Request) {
       }
       if (include.includes('trades')) {
         extras.trades = await fetchMarketTrades(ticker, 50);
+      }
+      if (include.includes('history')) {
+        extras.history = await Promise.race([
+          fetchMarketHistory(ticker, 100),
+          new Promise<never>((_, r) => setTimeout(() => r(new Error('timeout')), 4000)),
+        ]).catch(() => [] as Array<{ ts: number; pct: number }>);
       }
 
       return NextResponse.json({

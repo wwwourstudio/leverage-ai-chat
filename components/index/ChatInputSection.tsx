@@ -7,6 +7,7 @@ import type { FileAttachment } from '@/lib/hooks/useFileHandling';
 import type { Chat } from '@/lib/hooks/useChatList';
 import type { Message } from '@/app/types/chat';
 import type { PromptItem } from '@/lib/prompt-data';
+import { getPlaceholderText } from '@/lib/prompt-data';
 import { useAppStore, type AppCategory } from '@/lib/store/app-store';
 import { useUserStore } from '@/lib/store/user-store';
 import { useFantasyStore } from '@/lib/store/fantasy-store';
@@ -57,7 +58,8 @@ export function ChatInputSection({
   onPromptClick, onWelcomeAction, setChats, activeChat,
   voiceConvState, voiceConvSupported, onActivateVoice, lastAssistantMessage,
 }: ChatInputSectionProps) {
-  const { selectedCategory, selectedSport, deepThink, toggleDeepThink, systemStatus, selectCategory } = useAppStore();
+  const { selectedCategory, selectedSport, selectedKalshiTopic, deepThink, toggleDeepThink, systemStatus, selectCategory } = useAppStore();
+  const inputPlaceholder = getPlaceholderText(selectedCategory, selectedSport, selectedKalshiTopic);
   const { isLoggedIn } = useUserStore();
   const { fantasyLeague, setFantasyLeague, fantasySetupData, setFantasySetupData, fantasySetupStep, setFantasySetupStep, resetSetup } = useFantasyStore();
   const { showLimitNotification, setShowLimitNotification } = useModalState();
@@ -128,6 +130,7 @@ export function ChatInputSection({
           onOpenStripe={onOpenStripe}
           lastUserQuery={lastUserQuery}
           selectedCategory={selectedCategory}
+          placeholder={inputPlaceholder}
           deepThink={deepThink}
           onToggleDeepThink={toggleDeepThink}
           systemStatus={systemStatus}

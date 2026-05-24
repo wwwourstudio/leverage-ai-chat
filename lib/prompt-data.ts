@@ -349,13 +349,24 @@ export const sportSelectionDFSPrompts: PromptItem[] = [
   { label: 'MLB DFS',         icon: DollarSign, category: 'dfs', query: 'MLB DFS optimal lineups and pitcher stacks for DraftKings tonight' },
 ];
 
+const kalshiAllPrompts: PromptItem[] = [
+  { label: 'Show me Kalshi markets with the best edge right now', icon: TrendingUp, category: 'kalshi' },
+  { label: 'Top prediction market opportunities today',            icon: BarChart3,  category: 'kalshi' },
+  { label: 'Compare Kalshi vs sportsbook implied odds',            icon: DollarSign, category: 'kalshi' },
+  { label: 'Highest volume Kalshi markets today',                  icon: Activity,   category: 'kalshi' },
+  { label: 'Find Kalshi arbitrage opportunities',                  icon: Zap,        category: 'kalshi' },
+];
+
 export function getHardcodedQuickActions(
   selectedCategory: string,
   selectedSport: string,
   selectedKalshiTopic: string,
 ): PromptItem[] {
-  if (selectedCategory === 'kalshi' && selectedKalshiTopic && kalshiTopicPrompts[selectedKalshiTopic]) {
-    return kalshiTopicPrompts[selectedKalshiTopic];
+  if (selectedCategory === 'kalshi') {
+    if (selectedKalshiTopic && kalshiTopicPrompts[selectedKalshiTopic]) {
+      return kalshiTopicPrompts[selectedKalshiTopic];
+    }
+    return kalshiAllPrompts;
   }
   if (selectedSport) {
     if (selectedCategory === 'betting' && sportBettingPrompts[selectedSport]) return sportBettingPrompts[selectedSport];
@@ -369,4 +380,27 @@ export function getHardcodedQuickActions(
     if (selectedCategory === 'dfs')     return sportSelectionDFSPrompts;
   }
   return platformPrompts[selectedCategory] ?? platformPrompts.all;
+}
+
+const SPORT_LABELS: Record<string, string> = {
+  nfl: 'NFL', nba: 'NBA', mlb: 'MLB', nhl: 'NHL',
+  'ncaa-football': 'NCAAF', 'ncaa-basketball': 'NCAAB', 'ncaa-basketball-w': 'NCAAW',
+};
+
+export function getPlaceholderText(category: string, sport: string, kalshiTopic: string): string {
+  if (category === 'kalshi') {
+    if (kalshiTopic) return `Ask about ${kalshiTopic.toLowerCase()} prediction markets...`;
+    return 'Ask about prediction markets, implied odds, edge...';
+  }
+  const sportLabel = SPORT_LABELS[sport] ?? sport.toUpperCase();
+  if (category === 'betting') {
+    return sport ? `Ask about ${sportLabel} betting odds, lines, and edges...` : 'Ask about betting odds, spreads, parlays, and value...';
+  }
+  if (category === 'fantasy') {
+    return sport ? `Ask about ${sportLabel} fantasy strategy, waiver wire, and trades...` : 'Ask about draft picks, waiver wire, and ADP values...';
+  }
+  if (category === 'dfs') {
+    return sport ? `Ask about ${sportLabel} DFS lineups, stacks, and value plays...` : 'Build a DFS lineup, find value plays and stacks...';
+  }
+  return 'Ask about betting odds, fantasy, DFS, or Kalshi markets...';
 }

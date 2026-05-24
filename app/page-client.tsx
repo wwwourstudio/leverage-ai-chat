@@ -788,7 +788,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     { id: 'betting', name: 'Sports Betting', icon: TrendingUp, color: 'text-orange-400', desc: 'Live Odds & Props' },
     { id: 'fantasy', name: 'Fantasy',        icon: Trophy,    color: 'text-violet-400', desc: 'Season-long & Best Ball' },
     { id: 'dfs',     name: 'DFS Optimizer',  icon: Award,     color: 'text-purple-400', desc: 'DK/FD Lineups' },
-    { id: 'kalshi',  name: 'Kalshi Markets', icon: BarChart3,  color: 'text-cyan-400',   desc: 'Financial Prediction' },
+    { id: 'kalshi',  name: 'Kalshi Markets', icon: BarChart3,  color: 'text-cyan-400',   desc: 'Prediction Markets' },
   ];
 
   const sports = useMemo(() => {

@@ -13,6 +13,7 @@ import { isDev } from '@/lib/config';
 export interface UseSuggestedPromptsOptions {
   selectedCategory: string;
   selectedSport: string;
+  selectedKalshiTopic: string;
   initPromptsLoadedRef: React.MutableRefObject<boolean>;
 }
 
@@ -33,6 +34,7 @@ const UNIVERSAL_SUGGESTIONS: PromptItem[] = [
 export function useSuggestedPrompts({
   selectedCategory,
   selectedSport,
+  selectedKalshiTopic,
   initPromptsLoadedRef,
 }: UseSuggestedPromptsOptions) {
   const [suggestedPrompts, setSuggestedPrompts] = useState<PromptItem[]>([]);
@@ -42,7 +44,8 @@ export function useSuggestedPrompts({
   const lastSuggestionQueryRef = useRef<string>('');
   const normalizedCategory = useMemo(() => selectedCategory.toLowerCase(), [selectedCategory]);
 
-  // Fetch AI-generated quick-action prompts when category or sport changes.
+  // Fetch AI-generated quick-action prompts when category, sport, or Kalshi topic changes.
+  // Only replaces hardcoded prompts when the API returns AI-generated content (not static fallback).
   // Skips the first mount if loadInitData already seeded prompts (initPromptsLoadedRef guard).
   useEffect(() => {
     if (initPromptsLoadedRef.current) {
@@ -51,11 +54,16 @@ export function useSuggestedPrompts({
     }
     let cancelled = false;
     setAiQuickActions(null);
-    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}`)
+    const topicParam = selectedCategory === 'kalshi' && selectedKalshiTopic
+      ? `&topic=${encodeURIComponent(selectedKalshiTopic)}`
+      : '';
+    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}${topicParam}`)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;
-        if (data.success && Array.isArray(data.prompts) && data.prompts.length > 0) {
+        // Only override hardcoded prompts with AI-generated content — not static fallbacks.
+        // Static fallbacks are generic; the hardcoded prompts in prompt-data.ts are more specific.
+        if (data.success && data.generated && Array.isArray(data.prompts) && data.prompts.length > 0) {
           setAiQuickActions(
             data.prompts.map((p: { label: string; query: string }) => ({
               label: p.label,
@@ -68,7 +76,7 @@ export function useSuggestedPrompts({
       })
       .catch(() => { /* network failure — fall back to hardcoded */ });
     return () => { cancelled = true; };
-  }, [selectedCategory, selectedSport]);
+  }, [selectedCategory, selectedSport, selectedKalshiTopic]);
 
   const generateContextualSuggestions = useCallback((userMessage: string, responseCards: InsightCard[]) => {
     if (userMessage === lastSuggestionQueryRef.current && responseCards.length === 0) {

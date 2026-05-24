@@ -91,10 +91,14 @@ function ProbabilityChart({
       else if (range === '1M') pts = pts.filter(p => p.ts >= now - 30 * 86400000);
 
       if (pts.length < 2) {
+        const windowMs =
+          range === '1D' ? 86400000 :
+          range === '1W' ? 7 * 86400000 :
+          range === '1M' ? 30 * 86400000 : 90 * 86400000;
         const prev = Math.max(1, Math.min(99, o.yesPct - (o.isLeading ? 5 : -3)));
         pts = [
-          { ts: now - 7 * 86400000, pct: prev },
-          { ts: now - 3 * 86400000, pct: Math.round((prev + o.yesPct) / 2) },
+          { ts: now - windowMs, pct: prev },
+          { ts: now - windowMs / 2, pct: Math.round((prev + o.yesPct) / 2) },
           { ts: now, pct: o.yesPct },
         ];
       }
@@ -341,7 +345,11 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
               <span className="text-[11px] text-gray-500">{market.volume} vol</span>
             </div>
 
-            {/* ── Outcomes table (always visible at top, matching screenshot style) ── */}
+            {/* ── Outcomes table ── */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Chance</span>
+              <span className="text-[11px] text-gray-600">{market.closeTimeIso ? `Closes ${new Date(market.closeTimeIso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</span>
+            </div>
             <div className="space-y-2 mb-5">
               {displayedOutcomes.map((o, i) => {
                 const delta = o.priceHistory.length >= 2

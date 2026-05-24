@@ -535,7 +535,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
           : selectedCategory;
 
         const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));
-        const refreshSport = extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined;
+        const refreshSport = detectedCategory === 'kalshi' ? undefined : (extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined);
         const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });
         if (freshCards.length === 0) {
           // Reset the guard so the next query can retry rather than being permanently blocked
@@ -596,7 +596,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
       : hasFantasyOrDFSQuery ? (hasDFSQuery ? 'dfs' : 'fantasy')
       : selectedCategory;
     const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));
-    const refreshSport = extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined;
+    const refreshSport = detectedCategory === 'kalshi' ? undefined : (extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined);
     try {
       setIsFetchingCards(true);
       const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, limit: 7 });

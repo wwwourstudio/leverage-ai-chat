@@ -178,7 +178,7 @@ export const KalshiMarketTile = memo(function KalshiMarketTile({ market, onClick
       <div className="space-y-2 mt-2.5">
         {outcomes.slice(0, 4).map((outcome, i) => {
           const color = OUTCOME_COLORS[i] ?? OUTCOME_COLORS[0];
-          const badgeBg = outcome.isLeading ? color.badge : '#1a1c24';
+          const badgeBg = outcome.isLeading ? '#0e9f6e' : '#1a1c24';
           const badgeText = outcome.isLeading ? '#ffffff' : '#6b7280';
           const badgeBorder = outcome.isLeading ? 'transparent' : '#2a2d3e';
 

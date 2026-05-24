@@ -185,7 +185,7 @@ function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
 }
 
 /** Package markets into a single grouped InsightCard for the UI. */
-function kalshiMarketsToGroupedCard(
+export function kalshiMarketsToGroupedCard(
   markets: any[],
   subcategory: string,
   parentTitle?: string,
@@ -209,53 +209,31 @@ function kalshiMarketsToGroupedCard(
 }
 
 function buildKalshiUnavailableCards(_count: number): InsightCard[] {
-  return [
-    {
-      type: CARD_TYPES.KALSHI_MARKET,
-      title: 'Kalshi Markets Temporarily Unavailable',
-      icon: 'AlertTriangle',
-      category: 'KALSHI',
-      subcategory: 'Service Status',
-      gradient: 'from-[var(--bg-surface)] to-[var(--bg-elevated)]',
-      realData: false,
-      status: 'neutral',
-      data: {
-        ticker: 'UNAVAILABLE',
-        iconLabel: 'markets',
-        description: 'Live Kalshi prediction market data is temporarily unavailable.',
-        suggestion: 'Try refreshing or ask Leverage AI about specific markets by name.',
-        status: 'API_UNAVAILABLE',
-      },
-      metadata: { source: 'Kalshi API', realData: false },
-    } as InsightCard,
-  ];
+  return [{
+    type: 'kalshi-trending',
+    title: 'Kalshi Markets Temporarily Unavailable',
+    icon: 'AlertTriangle',
+    category: 'KALSHI',
+    subcategory: 'Status',
+    gradient: 'from-teal-600 to-cyan-700',
+    realData: false,
+    status: CARD_STATUS.NEUTRAL,
+    data: { status: 'API_UNAVAILABLE' },
+  } as InsightCard];
 }
 
 function buildKalshiNoMarketsCards(): InsightCard[] {
-  return [
-    {
-      type: CARD_TYPES.KALSHI_INSIGHT,
-      title: 'No Active Prediction Markets',
-      icon: 'BarChart3',
-      category: 'KALSHI',
-      subcategory: 'Markets',
-      gradient: 'from-indigo-700 to-violet-800',
-      status: CARD_STATUS.NEUTRAL,
-      realData: false,
-      data: {
-        status: 'NO_MARKETS',
-        iconLabel: 'markets',
-        yesPct: 50,
-        noPct: 50,
-        edgeScore: 0,
-        signal: 'No open prediction markets currently available on Kalshi for this category. Check kalshi.com for the latest markets.',
-        volumeTier: 'Thin',
-        spreadLabel: 'N/A',
-        priceDirection: 'flat',
-        priceChange: 0,
-      },
-    } as InsightCard,
-  ];
+  return [{
+    type: 'kalshi-trending',
+    title: 'No Active Prediction Markets',
+    icon: 'BarChart3',
+    category: 'KALSHI',
+    subcategory: 'Markets',
+    gradient: 'from-teal-600 to-cyan-700',
+    realData: false,
+    status: CARD_STATUS.NEUTRAL,
+    data: { status: 'NO_MARKETS' },
+  } as InsightCard];
 }
 
 async function tryDbFallback(count: number, subcategory?: string): Promise<any[]> {

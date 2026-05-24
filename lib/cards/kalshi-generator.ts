@@ -185,7 +185,7 @@ function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
 }
 
 /** Package markets into a single grouped InsightCard for the UI. */
-function kalshiMarketsToGroupedCard(
+export function kalshiMarketsToGroupedCard(
   markets: any[],
   subcategory: string,
   parentTitle?: string,

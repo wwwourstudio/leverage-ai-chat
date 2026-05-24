@@ -582,7 +582,7 @@ export async function POST(request: NextRequest) {
                 state.usedFallback ? { name: 'Fallback Mode', type: 'cache', reliability: 65 } : DEFAULT_SOURCES.GROK_AI,
               ];
               if (hasRealOdds)                                     sources.push(DEFAULT_SOURCES.ODDS_API);
-              if (context.isPoliticalMarket)                        sources.push(DEFAULT_SOURCES.KALSHI);
+              if (context.isPoliticalMarket || context.selectedCategory === 'kalshi' || kalshiSportsFallbackMarkets?.length) sources.push(DEFAULT_SOURCES.KALSHI);
               if (context.hasFantasyIntent && !context.hasBettingIntent) sources.push({ name: 'Fantasy Projections Engine', type: 'database', reliability: 91 });
               if (hasADPIntent) {
                 const isNFLC = context?.sport?.includes('football') || context?.sport === 'nfl' || rawQueryLower.includes('nffc') || rawQueryLower.includes('nfl draft') || rawQueryLower.includes('fantasy football');

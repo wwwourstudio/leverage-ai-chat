@@ -178,6 +178,7 @@ function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
     volume: vol,
     marketCount: 1,
     isLive: m.status === 'active' || m.status === 'open',
+    liveStatus: (m.status === 'active' || m.status === 'open') && m.subtitle && /^\w+[\s\d]/.test(m.subtitle) ? m.subtitle : undefined,
     eventTicker: m.eventTicker,
     closeTimeIso: m.closeTime || null,
     ...iconMeta,

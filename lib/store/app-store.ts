@@ -56,6 +56,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         selectedCategory: state.selectedCategory,
         selectedSport: state.selectedSport,
+        selectedKalshiTopic: state.selectedKalshiTopic,
         deepThink: state.deepThink,
       }),
     },

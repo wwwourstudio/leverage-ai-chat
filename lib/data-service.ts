@@ -57,6 +57,7 @@ async function safeJsonParse(response: Response): Promise<any> {
 export async function fetchDynamicCards(params: {
   sport?: string;
   category?: string;
+  topic?: string;
   userContext?: any;
   limit?: number;
   draftGroupId?: number;

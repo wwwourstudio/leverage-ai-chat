@@ -37,67 +37,139 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function fmtVol(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return n > 0 ? `$${n}` : '—';
-}
-
 function deriveChip(m: any): string {
   const s = m.seriesTicker || m.category || '';
-  if (s && s !== 'Prediction Market') return s.toUpperCase().slice(0, 12);
-  return (m.category || 'KALSHI').toUpperCase().slice(0, 12);
+  if (s && s !== 'Prediction Market') return s.toUpperCase().slice(0, 14);
+  return (m.category || 'KALSHI').toUpperCase().slice(0, 14);
 }
 
-// Infer icon type and code from category/subcategory
-function deriveIconMeta(m: any, sub: string): { iconCode?: string; iconType?: 'city' | 'avatar' | 'flag' | 'team'; subcategoryLabel?: string } {
+/** Extract human-readable outcome labels from a binary Kalshi market. */
+function extractOutcomeLabels(m: any): [string, string] {
+  const title: string = m.title || '';
+
+  // "Team A vs Team B" / "Team A vs. Team B" → [TeamA, TeamB]
+  const vsMatch = title.match(/^(.+?)\s+vs\.?\s+(.+?)(?:\s*\?.*)?$/i);
+  if (vsMatch) {
+    const home = vsMatch[1].trim();
+    const away = vsMatch[2].trim().split(/\s+(wins?|to\s+win|winner)/i)[0].trim();
+    return [home, away];
+  }
+
+  // subtitle "Yes: <label>" from parseMarket
+  const sub: string = m.subtitle || '';
+  if (sub.startsWith('Yes: ') && sub.length > 5) {
+    return [sub.slice(5).trim(), 'No'];
+  }
+
+  // Climate/threshold markets — the title IS the range (e.g. "83° to 84°")
+  if (/°|\bto\b|\babove\b|\bbelow\b/i.test(title) && title.length < 40) {
+    return [title.replace(/\?$/, '').trim(), 'No'];
+  }
+
+  return ['Yes', 'No'];
+}
+
+/** Infer icon metadata from the market category/subcategory. */
+function deriveIconMeta(m: any, sub: string): {
+  iconCode?: string;
+  iconType?: 'city' | 'avatar' | 'flag' | 'team' | 'brand';
+  subcategoryLabel?: string;
+  dateLabel?: string;
+} {
   const cat = (m.category || '').toLowerCase();
   const title = (m.title || '').toLowerCase();
 
   if (sub === 'weather' || sub === 'climate' || cat.includes('weather') || cat.includes('climate') || cat.includes('temperature')) {
-    // Extract city abbreviation from title or series ticker
-    const cityMatch = (m.seriesTicker || m.title || '').match(/\b([A-Z]{2,4})\b/);
-    const code = cityMatch?.[1] ?? (m.seriesTicker?.slice(0, 3) ?? 'WX');
-    return { iconCode: code, iconType: 'city', subcategoryLabel: 'Climate' };
+    const seriesTk: string = m.seriesTicker || '';
+    // Kalshi climate tickers: KXHITEMP-AUS-2026MAY24 → city = AUS
+    const tkrCity = seriesTk.match(/-([A-Z]{2,4})-/)?.[1];
+    // Title: "Highest temperature in Austin today?" → AUS
+    const titleCityMap: Record<string, string> = {
+      austin: 'AUS', 'san francisco': 'SF', dallas: 'DAL', seattle: 'SEA',
+      'los angeles': 'LA', chicago: 'CHI', houston: 'HOU', 'new york': 'NYC',
+      miami: 'MIA', phoenix: 'PHX', denver: 'DEN', boston: 'BOS', atlanta: 'ATL',
+    };
+    let code = tkrCity ?? '';
+    if (!code) {
+      for (const [city, abbr] of Object.entries(titleCityMap)) {
+        if (title.includes(city)) { code = abbr; break; }
+      }
+    }
+    if (!code) code = (seriesTk.slice(0, 3) || 'WX').toUpperCase();
+    // Subcategory label from Kalshi climate categories
+    const subLabel = title.includes('natural') || title.includes('tornado') || title.includes('hurricane')
+      ? 'Natural Disasters'
+      : title.includes('hourly') ? 'Hourly Temperature'
+      : title.includes('high') ? 'High Temperature'
+      : 'Daily Temperature';
+    return { iconCode: code, iconType: 'city', subcategoryLabel: subLabel };
   }
+
   if (sub === 'politics' || sub === 'elections' || sub === 'election' ||
-      cat.includes('election') || cat.includes('politic') || title.includes('president') || title.includes('senate')) {
-    return { iconType: 'avatar', subcategoryLabel: 'Politics' };
+      cat.includes('election') || cat.includes('politic') ||
+      title.includes('president') || title.includes('senate') || title.includes('governor') || title.includes('mayor')) {
+    // Close date label for elections
+    const dateLabel = m.closeTime ? new Date(m.closeTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' @ 7:30AM' : undefined;
+    return { iconType: 'avatar', subcategoryLabel: 'Politics', dateLabel };
   }
+
   if (sub === 'culture' || sub === 'entertainment' ||
-      cat.includes('entertainment') || cat.includes('music') || cat.includes('award')) {
-    return { iconType: 'avatar', subcategoryLabel: 'Culture' };
+      cat.includes('entertainment') || cat.includes('music') || cat.includes('award') ||
+      cat.includes('movie') || cat.includes('film') || cat.includes('oscar')) {
+    return { iconType: 'brand', subcategoryLabel: 'Culture' };
   }
-  if (sub === 'sports' || sub === 'sport' || cat.includes('nfl') || cat.includes('nba') || cat.includes('mlb') || cat.includes('nhl')) {
+
+  if (sub === 'sports' || sub === 'sport' || cat.includes('nfl') || cat.includes('nba') ||
+      cat.includes('mlb') || cat.includes('nhl') || cat.includes('golf') || cat.includes('pga') ||
+      cat.includes('soccer') || cat.includes('tennis') || cat.includes('mma') || cat.includes('ufc')) {
+    const seriesTk = (m.seriesTicker || '').toUpperCase();
     const sportLabel =
-      cat.includes('mlb') || title.includes('mlb') || title.includes('baseball') ? 'Pro Baseball' :
-      cat.includes('nba') || title.includes('nba') || title.includes('basketball') ? 'Pro Basketball' :
-      cat.includes('nfl') || title.includes('nfl') || title.includes('football') ? 'Pro Football' :
-      cat.includes('nhl') || title.includes('nhl') || title.includes('hockey') ? 'Pro Hockey' : 'Sports';
-    return { iconType: 'team', subcategoryLabel: sportLabel };
+      seriesTk.startsWith('MLB') || seriesTk.startsWith('KXMLB') || cat.includes('mlb') || title.includes('baseball') ? 'Pro Baseball' :
+      seriesTk.startsWith('NBA') || seriesTk.startsWith('KXNBA') || cat.includes('nba') || title.includes('basketball') ? 'Pro Basketball' :
+      seriesTk.startsWith('NFL') || seriesTk.startsWith('KXNFL') || cat.includes('nfl') || title.includes('football') ? 'Pro Football' :
+      seriesTk.startsWith('NHL') || seriesTk.startsWith('KXNHL') || cat.includes('nhl') || title.includes('hockey') ? 'Pro Hockey' :
+      seriesTk.startsWith('PGA') || seriesTk.startsWith('KXGOLF') || cat.includes('golf') ? 'Golf' :
+      seriesTk.startsWith('KXTENNIS') || cat.includes('tennis') ? 'Tennis' :
+      seriesTk.startsWith('KXSOCCER') || cat.includes('soccer') ? 'Soccer' :
+      seriesTk.startsWith('KXUFC') || seriesTk.startsWith('UFC') || cat.includes('mma') ? 'MMA' :
+      'Sports';
+    // Extract sport category code for icon
+    const iconCode = sportLabel.replace('Pro ', '').toUpperCase().split(' ')[0];
+    return { iconType: 'team', subcategoryLabel: sportLabel, iconCode };
   }
+
   return {};
 }
 
-/** Convert a KalshiMarket to KalshiTileData for use in the grid card. */
+/** Format volume as Kalshi.com shows it — full dollar amount. */
+function fmtVolFull(n: number): string {
+  if (n <= 0) return '—';
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  return `$${n}`;
+}
+
+/** Convert a KalshiMarket to KalshiTileData with smart outcome labels and icon metadata. */
 function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
   const yesPct = Math.min(99, Math.max(1, Math.round(m.yesPrice ?? 50)));
-  const noPct = Math.min(99, Math.max(1, Math.round(m.noPrice ?? (100 - yesPct))));
-  const vol = fmtVol(m.volume24h > 0 ? m.volume24h : m.volume ?? 0);
+  const noPct  = Math.min(99, Math.max(1, Math.round(m.noPrice  ?? (100 - yesPct))));
+  const vol    = fmtVolFull(m.volume24h > 0 ? m.volume24h : m.volume ?? 0);
   const iconMeta = deriveIconMeta(m, sub);
+  const [yesLabel, noLabel] = extractOutcomeLabels(m);
+
   return {
     ticker: m.ticker ?? '',
     title: m.title ?? 'Market',
     categoryChip: deriveChip(m),
     outcomes: [
       {
-        label: 'Yes',
+        label: yesLabel,
         yesPct,
         multiplier: yesPct > 0 ? parseFloat((100 / yesPct).toFixed(2)) : 2,
-        isLeading: yesPct >= 50,
+        isLeading: yesPct >= noPct,
       },
       {
-        label: 'No',
+        label: noLabel,
         yesPct: noPct,
         multiplier: noPct > 0 ? parseFloat((100 / noPct).toFixed(2)) : 2,
         isLeading: noPct > yesPct,

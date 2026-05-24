@@ -95,10 +95,8 @@ function ProbabilityChart({
           range === '1D' ? 86400000 :
           range === '1W' ? 7 * 86400000 :
           range === '1M' ? 30 * 86400000 : 90 * 86400000;
-        const prev = Math.max(1, Math.min(99, o.yesPct - (o.isLeading ? 5 : -3)));
         pts = [
-          { ts: now - windowMs, pct: prev },
-          { ts: now - windowMs / 2, pct: Math.round((prev + o.yesPct) / 2) },
+          { ts: now - windowMs, pct: o.yesPct },
           { ts: now, pct: o.yesPct },
         ];
       }
@@ -207,10 +205,10 @@ function OrderbookView({
           <div key={i} className="relative grid grid-cols-3 text-xs px-4 py-1.5 hover:bg-[#1e2030] transition-colors">
             {/* Fill bar */}
             <div
-              className={`absolute right-0 top-0 h-full ${isYes ? 'bg-red-900/40' : 'bg-green-900/30'}`}
+              className={`absolute right-0 top-0 h-full ${isYes ? 'bg-green-900/30' : 'bg-red-900/40'}`}
               style={{ width: `${fillPct}%` }}
             />
-            <span className={`font-mono font-bold relative z-10 ${isYes ? 'text-red-400' : 'text-green-400'}`}>
+            <span className={`font-mono font-bold relative z-10 ${isYes ? 'text-green-400' : 'text-red-400'}`}>
               {row.price}¢
             </span>
             <span className="text-center text-gray-300 font-mono relative z-10">
@@ -233,6 +231,7 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
   const [activeView, setActiveView] = useState<ViewTab>('graph');
   const [tradeMode, setTradeMode] = useState<'Buy' | 'Sell'>('Buy');
   const [selectedOutcomeIdx, setSelectedOutcomeIdx] = useState(0);
+  const [expiry, setExpiry] = useState('GTC');
   const [history, setHistory] = useState<Array<{ ts: number; pct: number }> | null>(null);
   const [orderbook, setOrderbook] = useState<Orderbook | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -571,7 +570,7 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
               <div className="p-3.5 bg-[#141620] rounded-xl border border-[#2a2d3e] flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400 font-medium">Contracts</p>
-                  <p className="text-[10px] text-teal-500 mt-0.5">Earn 3.25% Interest</p>
+                  <p className="text-[10px] text-gray-600 mt-0.5">Opens on Kalshi.com</p>
                 </div>
                 <p className="text-2xl font-black text-gray-500">0</p>
               </div>
@@ -592,8 +591,9 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
                   {['GTC', '12AM EDT', 'IOC'].map(exp => (
                     <button
                       key={exp}
+                      onClick={() => setExpiry(exp)}
                       className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                        exp === 'GTC'
+                        expiry === exp
                           ? 'bg-white text-black'
                           : 'bg-[#141620] text-gray-400 hover:text-white'
                       }`}

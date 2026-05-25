@@ -57,7 +57,8 @@ export function useSuggestedPrompts({
     const topicParam = selectedCategory === 'kalshi' && selectedKalshiTopic
       ? `&topic=${encodeURIComponent(selectedKalshiTopic)}`
       : '';
-    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}&sport=${encodeURIComponent(selectedSport ?? '')}${topicParam}`)
+    const sportParam = selectedCategory !== 'kalshi' ? `&sport=${encodeURIComponent(selectedSport ?? '')}` : '';
+    fetch(`/api/prompts?category=${encodeURIComponent(selectedCategory)}${sportParam}${topicParam}`)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;

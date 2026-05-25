@@ -419,6 +419,7 @@ export function Sidebar({
   function handleCategorySelect(catId: string) {
     selectCategory(catId as AppCategory);
     if (catId !== 'kalshi') setSelectedKalshiTopic('');
+    if (catId === 'kalshi') setSelectedSport('');
     setSuggestedPrompts([]);
     setLastUserQuery('');
   }

@@ -258,7 +258,11 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
   const enrichedOutcomes = useMemo<KalshiDetailOutcome[]>(() => {
     return market.outcomes.map((o, i) => ({
       ...o,
-      priceHistory: i === 0 && history ? history : o.priceHistory,
+      priceHistory: history
+        ? i === 0
+          ? history
+          : history.map(p => ({ ts: p.ts, pct: 100 - p.pct }))
+        : o.priceHistory,
     }));
   }, [market.outcomes, history]);
 

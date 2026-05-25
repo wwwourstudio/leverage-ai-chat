@@ -38,9 +38,11 @@ function cap(s: string): string {
 }
 
 function deriveChip(m: any): string {
-  const s = m.seriesTicker || m.category || '';
-  if (s && s !== 'Prediction Market') return s.toUpperCase().slice(0, 14);
-  return (m.category || 'KALSHI').toUpperCase().slice(0, 14);
+  const cat = (m.category || '').trim();
+  if (cat && cat !== 'Prediction Market') return cat.toUpperCase().slice(0, 14);
+  // Strip KX prefix and take first dash-segment: KXMLB-24-BOSRED → MLB
+  const tk = (m.seriesTicker || '').replace(/^KX/, '').split('-')[0];
+  return (tk || 'KALSHI').toUpperCase().slice(0, 14);
 }
 
 /** Extract human-readable outcome labels from a binary Kalshi market. */
@@ -177,7 +179,7 @@ function normalizeMarketForTile(m: any, sub = ''): KalshiTileData {
     ],
     volume: vol,
     marketCount: 1,
-    isLive: m.status === 'active' || m.status === 'open',
+    isLive: m.status === 'active',
     liveStatus: (m.status === 'active' || m.status === 'open') && m.subtitle && /^\w+[\s\d]/.test(m.subtitle) ? m.subtitle : undefined,
     eventTicker: m.eventTicker,
     closeTimeIso: m.closeTime || null,

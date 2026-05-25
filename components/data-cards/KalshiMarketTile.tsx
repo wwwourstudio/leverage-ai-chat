@@ -214,7 +214,7 @@ export const KalshiMarketTile = memo(function KalshiMarketTile({ market, onClick
                 </span>
               </div>
               {/* Progress bar */}
-              <div className="mt-1 h-px rounded-full overflow-hidden bg-[#2a2d3e]">
+              <div className="mt-1 h-0.5 rounded-full overflow-hidden bg-[#2a2d3e]">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{

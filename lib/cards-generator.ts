@@ -1768,9 +1768,23 @@ export function cardsToPromptContext(cards: InsightCard[]): string {
 
     // ── Kalshi / prediction market cards ─────────────────────────────────────
     if (
-      card.type === CARD_TYPES.KALSHI_INSIGHT || card.type === CARD_TYPES.KALSHI_MARKET ||
-      card.type === 'kalshi' || card.type === 'kalshi-market'
+      card.type.startsWith('kalshi') || card.type.includes('prediction') ||
+      card.type === CARD_TYPES.KALSHI_INSIGHT || card.type === CARD_TYPES.KALSHI_MARKET
     ) {
+      // Grouped card shape (new): data.markets[] — one line per market
+      if (Array.isArray(d.markets) && (d.markets as any[]).length > 0) {
+        for (const m of (d.markets as any[]).slice(0, 4)) {
+          const outcomes = (m.outcomes ?? []) as any[];
+          const leading = outcomes.find((o: any) => o.isLeading) ?? outcomes[0];
+          const parts: string[] = [`Kalshi: ${m.title}`];
+          if (leading) parts.push(`${leading.label}: ${leading.yesPct}%`);
+          if (outcomes[1] && !outcomes[1].isLeading) parts.push(`${outcomes[1].label}: ${outcomes[1].yesPct}%`);
+          if (m.volume) parts.push(`Vol: ${m.volume}`);
+          lines.push(parts.join(' | '));
+        }
+        continue;
+      }
+      // Legacy single-market shape
       const title = String(d.market ?? d.title ?? card.title ?? '');
       const parts: string[] = [`Kalshi: ${title}`];
       const yesCents = d.yesPct !== undefined ? d.yesPct : (d.yesPrice ? parseFloat(String(d.yesPrice)) : undefined);

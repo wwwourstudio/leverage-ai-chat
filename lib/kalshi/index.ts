@@ -202,7 +202,7 @@ function parseMarket(m: any): KalshiMarket {
     volume:       parseFp(m.volume_fp,        m.volume        ?? m.volume_24h ?? 0),
     openInterest: parseFp(m.open_interest_fp, m.open_interest ?? 0),
     closeTime:    m.close_time || m.expiration_time || m.end_date || '',
-    status:       m.status || 'active',
+    status:       m.status || 'open',
     priceIsReal:  lastPrice > 0 || yesBid > 0 || yesAsk > 0,
   };
 }

@@ -134,7 +134,7 @@ export async function GET(request: Request) {
 
     // ── Events endpoint ──────────────────────────────────────────────────────
     if (type === 'events') {
-      const events = await fetchKalshiEvents({ limit, search: search || undefined });
+      const events = await fetchKalshiEvents({ limit });
       return NextResponse.json({ success: true, events, count: events.length, timestamp: new Date().toISOString() });
     }
 

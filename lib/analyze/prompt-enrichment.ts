@@ -242,10 +242,11 @@ export async function buildEnrichedPrompt(
       let markets: any[] | null = await cacheGet<any[]>(_kalshiMainKey).catch(() => null);
 
       if (markets === null) {
-        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets } = await import('@/lib/kalshi/index');
+        const { fetchElectionMarkets, fetchKalshiMarketsWithRetry, fetchEntertainmentMarkets, fetchFinanceMarkets } = await import('@/lib/kalshi/index');
         const ENTERTAINMENT_SUBS = ['entertainment', 'culture', 'awards', 'oscars', 'grammys',
           'emmys', 'films', 'movies', 'music', 'tv', 'celebrity', 'pop culture', 'arts',
           'film', 'oscar', 'grammy', 'emmy'];
+        const FINANCE_SUBS = ['finance', 'financials', 'economics', 'crypto', 'companies'];
         const fetchMarkets =
           (sub === 'politics' || sub === 'elections' || sub === 'election')
             ? fetchElectionMarkets({ limit: 50 })
@@ -253,11 +254,13 @@ export async function buildEnrichedPrompt(
             ? fetchKalshiMarketsWithRetry({ search: 'NFL NBA MLB NHL Super Bowl March Madness', limit: 30, maxRetries: 2 })
           : ENTERTAINMENT_SUBS.includes(sub)
             ? fetchEntertainmentMarkets(50)
+          : FINANCE_SUBS.includes(sub)
+            ? fetchFinanceMarkets(50)
           : fetchKalshiMarketsWithRetry({ limit: 50, maxRetries: 3 });
 
         markets = await Promise.race([
           fetchMarkets,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)), // was 6000
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
         ]).catch(() => null);
 
         if (Array.isArray(markets)) {

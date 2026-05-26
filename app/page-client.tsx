@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { useAuth } from '@/components/AuthProvider';
 import dynamic from 'next/dynamic';
 import { fetchDynamicCards } from '@/lib/data-service';
+import { useCardRefresh } from '@/lib/hooks/use-card-refresh';
 import { FREE_TIER, GROK_VOICE_STORAGE_KEY, GROK_VOICE_DEFAULT } from '@/lib/constants';
 import { isDev as getIsDev } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
@@ -607,6 +608,9 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     } catch { /* non-critical */ }
     finally { setIsFetchingCards(false); }
   }, [lastUserQuery, isFetchingCards, selectedCategory, selectedSport, messages]);
+
+  // ── Live card refresh via Supabase realtime ───────────────────────────────────
+  useCardRefresh({ onRefresh: handleRefreshCards, enabled: !!lastUserQuery });
 
   // ── Response generation ───────────────────────────────────────────────────────
   const generateResponseStable = useCallback((msg: string) => {

@@ -317,8 +317,7 @@ export async function GET(req: NextRequest) {
                 const msg: string = (error as any).message ?? '';
                 if (!isBenignRpcError(msg)) console.error('[cron/odds] cleanup_odds_snapshots error:', msg);
               }
-            })
-            .catch(() => { /* AbortError when cleanupCtrl fires — expected */ }),
+            }, () => { /* AbortError when cleanupCtrl fires — expected */ }),
           supabase.rpc('cleanup_closing_lines', { retention_days: 90 })
             .abortSignal(cleanupCtrl.signal)
             .then(({ error }) => {
@@ -326,8 +325,7 @@ export async function GET(req: NextRequest) {
                 const msg: string = (error as any).message ?? '';
                 if (!isBenignRpcError(msg)) console.error('[cron/odds] cleanup_closing_lines error:', msg);
               }
-            })
-            .catch(() => { /* AbortError when cleanupCtrl fires — expected */ }),
+            }, () => { /* AbortError when cleanupCtrl fires — expected */ }),
         ]).finally(() => clearTimeout(cleanupTimeout));
       } catch (snapErr) {
         console.error('[v0] [cron/odds] Snapshot write exception:', snapErr);

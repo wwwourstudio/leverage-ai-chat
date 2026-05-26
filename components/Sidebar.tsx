@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle, LayoutGrid, TrendingUp, Trophy, Award, BarChart3 } from 'lucide-react';
+import {
+  Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle,
+  LayoutGrid, TrendingUp, Trophy, Award, BarChart3,
+  Zap, ChevronLeft, ChevronRight, X, Hash,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
 import { useAppStore, type AppCategory } from '@/lib/store/app-store';
@@ -58,35 +62,49 @@ export interface SidebarProps {
   onNavigate?: (query: string, category?: string, sport?: string) => void;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const SHORT_CAT_NAMES: Record<string, string> = {
-  all: 'All',
-  betting: 'Betting',
-  fantasy: 'Fantasy',
-  dfs: 'DFS',
-  kalshi: 'Kalshi',
+const RAIL_ICONS: Record<string, React.FC<{ className?: string }>> = {
+  all:     LayoutGrid,
+  betting: TrendingUp,
+  fantasy: Trophy,
+  dfs:     Award,
+  kalshi:  BarChart3,
 };
 
-function activeSportColor(category: string): string {
-  if (category === 'fantasy')   return 'bg-[var(--chip-bg)] text-[var(--cat-fantasy)] border-[var(--cat-fantasy)]/40';
-  if (category === 'dfs')       return 'bg-[var(--chip-bg)] text-[var(--cat-dfs)] border-[var(--cat-dfs)]/40';
-  if (category === 'kalshi')    return 'bg-[var(--chip-bg)] text-[var(--cat-kalshi)] border-[var(--cat-kalshi)]/40';
-  if (category === 'arbitrage') return 'bg-[var(--chip-bg)] text-[var(--cat-arbitrage)] border-[var(--cat-arbitrage)]/40';
-  return 'bg-[var(--chip-bg)] text-[var(--cat-betting)] border-[var(--cat-betting)]/40';
-}
+const CAT_STYLES: Record<string, {
+  active: string;
+  glow: string;
+  dot: string;
+  sport: string;
+}> = {
+  all:     { active: 'text-blue-400',   glow: 'shadow-blue-500/30',   dot: 'bg-blue-400',   sport: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  betting: { active: 'text-orange-400', glow: 'shadow-orange-500/30', dot: 'bg-orange-400', sport: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  fantasy: { active: 'text-violet-400', glow: 'shadow-violet-500/30', dot: 'bg-violet-400', sport: 'bg-violet-500/15 text-violet-400 border-violet-500/30' },
+  dfs:     { active: 'text-purple-400', glow: 'shadow-purple-500/30', dot: 'bg-purple-400', sport: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+  kalshi:  { active: 'text-cyan-400',   glow: 'shadow-cyan-500/30',   dot: 'bg-cyan-400',   sport: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
+};
+
+const KALSHI_TOPICS = [
+  'All', 'Trending', 'Politics', 'Sports', 'Culture', 'Crypto',
+  'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science',
+];
+
+const SPORT_TAG_ACCENT: Record<string, string> = {
+  betting: 'border-l-blue-500/60',
+  'multi-platform': 'border-l-blue-500/60',
+  fantasy: 'border-l-violet-500/60',
+  dfs: 'border-l-yellow-500/60',
+  kalshi: 'border-l-cyan-500/60',
+  mlb: 'border-l-red-400/60',
+  nfl: 'border-l-amber-500/60',
+  nba: 'border-l-orange-400/60',
+  nhl: 'border-l-sky-400/60',
+};
 
 function tagAccentClass(tags: string[]): string {
   const first = (tags[0] ?? '').toLowerCase();
-  if (first === 'betting' || first === 'multi-platform') return 'border-l-2 border-l-blue-500/60';
-  if (first === 'fantasy')  return 'border-l-2 border-l-violet-500/60';
-  if (first === 'dfs')      return 'border-l-2 border-l-yellow-500/60';
-  if (first === 'kalshi')   return 'border-l-2 border-l-cyan-500/60';
-  if (first === 'mlb')      return 'border-l-2 border-l-red-500/60';
-  if (first === 'nfl')      return 'border-l-2 border-l-amber-500/60';
-  if (first === 'nba')      return 'border-l-2 border-l-orange-500/60';
-  if (first === 'nhl')      return 'border-l-2 border-l-sky-500/60';
-  return 'border-l-2 border-l-[var(--border-subtle)]';
+  return `border-l-2 ${SPORT_TAG_ACCENT[first] ?? 'border-l-[var(--border-subtle)]'}`;
 }
 
 function groupChatsByDate(chats: Chat[]): Array<{ label: string; chats: Chat[] }> {
@@ -103,27 +121,35 @@ function groupChatsByDate(chats: Chat[]): Array<{ label: string; chats: Chat[] }
 
   for (const chat of chats) {
     const t = new Date(chat.timestamp).getTime();
-    if (t >= todayMs)        groups[0].chats.push(chat);
-    else if (t >= yesterMs)  groups[1].chats.push(chat);
-    else if (t >= weekAgoMs) groups[2].chats.push(chat);
-    else                     groups[3].chats.push(chat);
+    if      (t >= todayMs)    groups[0].chats.push(chat);
+    else if (t >= yesterMs)   groups[1].chats.push(chat);
+    else if (t >= weekAgoMs)  groups[2].chats.push(chat);
+    else                       groups[3].chats.push(chat);
   }
 
   return groups.filter(g => g.chats.length > 0);
 }
 
-const RAIL_ICONS: Record<string, React.FC<{ className?: string }>> = {
-  all:     LayoutGrid,
-  betting: TrendingUp,
-  fantasy: Trophy,
-  dfs:     Award,
-  kalshi:  BarChart3,
-};
+// ── Chat Skeleton ─────────────────────────────────────────────────────────────
 
-const KALSHI_TOPICS = [
-  'Trending', 'Politics', 'Sports', 'Culture', 'Crypto',
-  'Climate', 'Economics', 'Mentions', 'Companies', 'Financials', 'Tech & Science',
-];
+function ChatSkeleton() {
+  return (
+    <div className="space-y-1 px-2 pt-1">
+      {[0.85, 0.65, 0.75, 0.55, 0.7].map((w, i) => (
+        <div
+          key={i}
+          className="h-[58px] rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 flex items-center gap-3 overflow-hidden"
+        >
+          <div className="w-1.5 h-8 rounded-full bg-[var(--bg-elevated)] animate-pulse flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] animate-pulse" style={{ width: `${w * 100}%` }} />
+            <div className="h-2 rounded-full bg-[var(--bg-elevated)] animate-pulse opacity-60" style={{ width: `${w * 65}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ── Chat Card ─────────────────────────────────────────────────────────────────
 
@@ -158,169 +184,418 @@ const ChatCard = memo(function ChatCard({
     <button
       type="button"
       onClick={() => onSelectChat(chat.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectChat(chat.id); } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectChat(chat.id); }
+      }}
       className={cn(
-        'group relative w-full text-left rounded-xl p-2.5 cursor-pointer transition-all duration-200 overflow-hidden',
+        'group relative w-full text-left rounded-xl transition-all duration-200 overflow-hidden',
         tagAccentClass(chat.tags),
         isActive
-          ? 'bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-          : 'bg-[var(--bg-overlay)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] hover:border-[var(--border-subtle)] hover:-translate-y-px hover:shadow-md',
+          ? 'bg-[var(--bg-elevated)] border border-[var(--border-default)] shadow-md'
+          : 'bg-transparent border border-transparent hover:bg-[var(--bg-surface)] hover:border-[var(--border-subtle)]',
       )}
     >
+      {/* Active indicator glow line */}
       {isActive && (
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
       )}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1 group/title">
-            <MessageSquare className={cn(
-              'w-3 h-3 flex-shrink-0 transition-colors',
-              isActive ? 'text-blue-400' : 'text-[var(--text-faint)]',
-            )} />
+
+      <div className="px-3 py-2.5">
+        {/* Title row */}
+        <div className="flex items-start gap-2 mb-1">
+          <MessageSquare className={cn(
+            'w-3 h-3 mt-0.5 flex-shrink-0 transition-colors duration-150',
+            isActive ? 'text-blue-400' : 'text-[var(--text-faint)] group-hover:text-[var(--text-muted)]',
+          )} />
+
+          <div className="flex-1 min-w-0 flex items-center gap-1">
             {isEditing ? (
-              <div className="flex-1 flex items-center gap-1">
+              <div className="flex-1 flex items-center gap-1.5">
                 <input
                   type="text"
                   value={editingChatTitle}
                   onChange={(e: any) => setEditingChatTitle(e.target.value)}
                   onKeyDown={(e: any) => onKeyDownChatTitle(e, chat.id)}
                   onBlur={() => onSaveChatTitle(chat.id)}
-                  className="flex-1 bg-[var(--bg-elevated)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-                  autoFocus
                   onClick={(e: any) => e.stopPropagation()}
+                  autoFocus
+                  className="flex-1 min-w-0 bg-[var(--bg-overlay)] border border-blue-500/50 rounded-md px-2 py-0.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500/30"
                 />
                 <button
                   onClick={(e: any) => { e.stopPropagation(); onSaveChatTitle(chat.id); }}
-                  className="p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all"
+                  className="flex-shrink-0 p-0.5 rounded hover:bg-[var(--bg-elevated)] transition-colors"
                 >
                   <CheckCircle className="w-3 h-3 text-blue-400" />
                 </button>
               </div>
             ) : (
-              <div className="flex-1 flex items-center gap-1 min-w-0">
-                <h3 className="text-xs font-bold text-foreground truncate flex-1">{chat.title}</h3>
+              <>
+                <h3 className={cn(
+                  'text-xs font-semibold truncate flex-1 transition-colors',
+                  isActive ? 'text-foreground' : 'text-[var(--text-muted)] group-hover:text-foreground',
+                )}>
+                  {chat.title}
+                </h3>
                 <button
                   onClick={(e: any) => onEditChatTitle(chat.id, chat.title, e)}
-                  className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-[var(--bg-elevated)] rounded transition-all flex-shrink-0"
-                  title="Edit title" aria-label="Edit chat title"
+                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 rounded hover:bg-[var(--bg-elevated)] transition-all"
+                  title="Rename"
+                  aria-label="Rename chat"
                 >
-                  <Edit3 className="w-2.5 h-2.5 text-[var(--text-faint)] hover:text-blue-400" />
+                  <Edit3 className="w-2.5 h-2.5 text-[var(--text-faint)]" />
                 </button>
-              </div>
+              </>
             )}
           </div>
 
-          <p className="text-[11px] text-[var(--text-faint)] truncate mb-1.5 leading-tight pl-[18px]">
+          {/* Action buttons */}
+          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e: any) => onStarChat(chat.id, e)}
+              className="p-1 rounded-lg hover:bg-[var(--bg-elevated)] transition-all active:scale-90"
+              title={chat.starred ? 'Unstar' : 'Star'}
+              aria-label={chat.starred ? 'Unstar chat' : 'Star chat'}
+            >
+              <Star className={cn(
+                'w-3 h-3 transition-colors',
+                chat.starred ? 'text-amber-400 fill-amber-400' : 'text-[var(--text-faint)] hover:text-amber-400',
+              )} />
+            </button>
+            <button
+              onClick={(e: any) => onDeleteChat(chat.id, e)}
+              className="p-1 rounded-lg hover:bg-red-500/10 transition-all active:scale-90"
+              title="Delete"
+              aria-label="Delete chat"
+            >
+              <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />
+            </button>
+          </div>
+
+          {/* Star indicator (always visible when starred + not hovered) */}
+          {chat.starred && (
+            <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0 group-hover:hidden" />
+          )}
+        </div>
+
+        {/* Preview + meta row */}
+        <div className="pl-5 flex items-end justify-between gap-2">
+          <p className="text-[11px] text-[var(--text-faint)] truncate flex-1 leading-tight">
             {chat.preview}
           </p>
+          <span suppressHydrationWarning className="text-[10px] text-[var(--text-faint)] whitespace-nowrap flex-shrink-0 tabular-nums">
+            {formatRelativeTime(chat.timestamp)}
+          </span>
+        </div>
 
-          <div className="flex items-center justify-between gap-2 pl-[18px]">
-            <div className="flex items-center gap-1 flex-wrap">
-              {chat.tags.slice(0, 2).map((tag, i) => (
-                <span
-                  key={i}
-                  className="px-1.5 py-0.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-[9px] font-semibold text-[var(--text-faint)] uppercase tracking-wide"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <span suppressHydrationWarning className="text-[9px] text-[var(--text-faint)] whitespace-nowrap">
-              {formatRelativeTime(chat.timestamp)}
-            </span>
+        {/* Tags row */}
+        {chat.tags.length > 0 && (
+          <div className="pl-5 mt-1.5 flex items-center gap-1 flex-wrap">
+            {chat.tags.slice(0, 3).map((tag, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[9px] font-bold uppercase tracking-wider bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-faint)]"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
-        </div>
-
-        <div className="flex flex-col gap-0.5 flex-shrink-0">
-          <button
-            onClick={(e: any) => onStarChat(chat.id, e)}
-            className={cn(
-              'p-1 rounded-md hover:bg-[var(--bg-elevated)] transition-all hover:scale-110 active:scale-90',
-              chat.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-            )}
-            title={chat.starred ? 'Unstar' : 'Star'} aria-label={chat.starred ? 'Unstar chat' : 'Star chat'}
-          >
-            <Star className={cn(
-              'w-3 h-3',
-              chat.starred ? 'text-yellow-400 fill-yellow-400' : 'text-[var(--text-faint)]',
-            )} />
-          </button>
-          <button
-            onClick={(e: any) => onDeleteChat(chat.id, e)}
-            className="p-1 rounded-md hover:bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-90"
-            title="Delete" aria-label="Delete chat"
-          >
-            <Trash2 className="w-3 h-3 text-[var(--text-faint)] hover:text-red-400 transition-colors" />
-          </button>
-        </div>
+        )}
       </div>
     </button>
   );
 });
 
+// ── Section Header ────────────────────────────────────────────────────────────
 
-// ── Icon Rail ─────────────────────────────────────────────────────────────────
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5">
+      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-faint)]">{label}</span>
+      <div className="flex-1 h-px bg-[var(--border-subtle)] opacity-50" />
+      <span className="text-[9px] font-bold text-[var(--text-faint)] tabular-nums opacity-70">{count}</span>
+    </div>
+  );
+}
+
+// ── Collapsed Icon Rail ────────────────────────────────────────────────────────
 
 function IconRail({
   categories,
   onNewChat,
-  onNavigate,
 }: {
   categories: CategoryDef[];
   onNewChat: () => void;
-  onNavigate?: (query: string, category?: string, sport?: string) => void;
 }) {
-  const { selectedCategory, selectCategory } = useAppStore();
+  const { selectedCategory, selectCategory, setSidebarOpen } = useAppStore();
   const { user } = useUserStore();
   const { setShowUserLightbox } = useModalState();
 
   return (
-    <div className="w-14 flex flex-col items-center py-3 gap-1 h-full">
+    <div className="flex flex-col items-center h-full py-3 gap-1 w-14">
+      {/* Expand button */}
       <button
-        onClick={onNewChat}
-        className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 flex items-center justify-center transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 mb-2 flex-shrink-0"
-        title="New Analysis" aria-label="New analysis chat"
+        onClick={() => setSidebarOpen(true)}
+        className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[var(--bg-surface)] text-[var(--text-faint)] hover:text-foreground transition-all duration-150 group mb-1"
+        title="Expand sidebar"
+        aria-label="Expand sidebar"
       >
-        <Plus className="w-4 h-4 text-white" />
+        <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
       </button>
 
-      <div className="flex flex-col items-center gap-1 w-full px-2">
-        {categories.map(cat => {
-          const Icon = RAIL_ICONS[cat.id] ?? cat.icon;
-          const isActive = selectedCategory === cat.id;
-          return (
+      {/* New chat */}
+      <button
+        onClick={onNewChat}
+        className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 transition-all duration-200 hover:scale-105 active:scale-95 mb-2"
+        title="New Analysis"
+        aria-label="New analysis"
+      >
+        <Plus className="w-3.5 h-3.5 text-white" />
+      </button>
+
+      {/* Divider */}
+      <div className="w-5 h-px bg-[var(--border-subtle)] opacity-50 mb-1" />
+
+      {/* Category icons */}
+      {categories.map(cat => {
+        const Icon = RAIL_ICONS[cat.id] ?? cat.icon;
+        const isActive = selectedCategory === cat.id;
+        const styles = CAT_STYLES[cat.id] ?? CAT_STYLES.all;
+
+        return (
+          <div key={cat.id} className="relative w-full flex justify-center">
+            {isActive && (
+              <div className="absolute left-0 inset-y-1 w-0.5 rounded-r-full bg-gradient-to-b from-blue-500 to-indigo-500" />
+            )}
             <button
-              key={cat.id}
               onClick={() => selectCategory(cat.id as AppCategory)}
               title={cat.name}
+              aria-label={cat.name}
               className={cn(
-                'w-full h-9 rounded-xl flex items-center justify-center transition-all duration-200',
-                isActive ? 'bg-[var(--bg-elevated)]' : 'hover:bg-[var(--bg-surface)]',
+                'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150',
+                isActive
+                  ? 'bg-[var(--bg-elevated)]'
+                  : 'hover:bg-[var(--bg-surface)]',
               )}
             >
               <Icon className={cn(
-                'w-4 h-4 transition-colors',
-                isActive ? cat.color : 'text-[var(--text-faint)]',
+                'w-4 h-4 transition-colors duration-150',
+                isActive ? styles.active : 'text-[var(--text-faint)]',
               )} />
+            </button>
+          </div>
+        );
+      })}
+
+      <div className="flex-1" />
+
+      {/* User avatar */}
+      {user && (
+        <button
+          onClick={() => setShowUserLightbox(true)}
+          title={user.name}
+          aria-label="Open profile"
+          className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-blue-500/40 transition-all duration-200 flex-shrink-0 hover:scale-105 active:scale-95"
+        >
+          {user.avatar
+            ? <Image src={user.avatar} className="w-8 h-8 object-cover" alt="" width={32} height={32} />
+            : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
+              </div>
+            )
+          }
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Category Tab Strip ────────────────────────────────────────────────────────
+
+function CategoryTabs({
+  categories,
+  selectedCategory,
+  onSelect,
+}: {
+  categories: CategoryDef[];
+  selectedCategory: string;
+  onSelect: (id: string) => void;
+}) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Scroll active tab into view
+  useEffect(() => {
+    const el = tabsRef.current?.querySelector('[data-active="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [selectedCategory]);
+
+  return (
+    <div className="relative">
+      {/* Fade edges */}
+      <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 inset-y-0 w-4 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+
+      <div
+        ref={tabsRef}
+        className="flex gap-0.5 overflow-x-auto scrollbar-hide px-3"
+        role="tablist"
+      >
+        {categories.map(cat => {
+          const Icon = cat.icon;
+          const isActive = selectedCategory === cat.id;
+          const styles = CAT_STYLES[cat.id] ?? CAT_STYLES.all;
+
+          return (
+            <button
+              key={cat.id}
+              role="tab"
+              aria-selected={isActive}
+              data-active={isActive}
+              onClick={() => onSelect(cat.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all duration-150 flex-shrink-0 border',
+                isActive
+                  ? `bg-[var(--bg-elevated)] border-[var(--border-default)] ${styles.active}`
+                  : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+              )}
+            >
+              <Icon className={cn('w-3.5 h-3.5', isActive ? styles.active : '')} />
+              {cat.id === 'all' ? 'All' : cat.name.split(' ')[0]}
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      <div className="flex-1" />
+// ── Sport Filter Chips ─────────────────────────────────────────────────────────
 
-      {user && (
-        <div
-          className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-1 cursor-pointer hover:ring-2 hover:ring-blue-400/50 active:scale-95 transition-all"
-          title={user.name}
-          onClick={() => setShowUserLightbox(true)}
+function SportChips({
+  sports,
+  selectedSport,
+  selectedCategory,
+  onSelect,
+}: {
+  sports: SportDef[];
+  selectedSport: string;
+  selectedCategory: string;
+  onSelect: (id: string) => void;
+}) {
+  const styles = CAT_STYLES[selectedCategory] ?? CAT_STYLES.all;
+  const filtered = sports.filter(s =>
+    !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa'))
+  );
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="relative px-3">
+      <div className="absolute right-3 inset-y-0 w-6 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
+      <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0.5 pr-6">
+        {/* All sports pill */}
+        <button
+          onClick={() => onSelect('')}
+          className={cn(
+            'flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all duration-150 flex-shrink-0 border',
+            selectedSport === ''
+              ? `${styles.sport} border`
+              : 'border-[var(--border-subtle)]/50 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+          )}
         >
-          {user.avatar
-            ? <Image src={user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" width={32} height={32} />
-            : <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
-          }
+          All
+        </button>
+
+        {filtered.map(sport => {
+          const isActive = selectedSport === sport.id;
+          return (
+            <button
+              key={sport.id}
+              onClick={() => onSelect(isActive ? '' : sport.id)}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all duration-150 flex-shrink-0 border',
+                isActive
+                  ? `${styles.sport} border`
+                  : sport.isInSeason
+                    ? 'border-transparent text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
+                    : 'border-transparent text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
+              )}
+            >
+              {sport.isInSeason && (
+                <span className={cn(
+                  'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                  isActive ? 'bg-current' : 'bg-emerald-400',
+                )} />
+              )}
+              {sport.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Kalshi Topic Chips ────────────────────────────────────────────────────────
+
+function KalshiTopics({
+  selectedTopic,
+  onSelect,
+}: {
+  selectedTopic: string;
+  onSelect: (topic: string) => void;
+}) {
+  return (
+    <div className="px-3">
+      <div className="flex flex-wrap gap-1">
+        {KALSHI_TOPICS.map(topic => {
+          const isActive = topic === 'All' ? selectedTopic === '' : selectedTopic === topic;
+          return (
+            <button
+              key={topic}
+              onClick={() => onSelect(topic === 'All' ? '' : (selectedTopic === topic ? '' : topic))}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-150 border',
+                isActive
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+                  : 'border-[var(--border-subtle)]/50 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
+              )}
+            >
+              {topic}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+
+function EmptyState({ query }: { query: string }) {
+  if (query) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+        <div className="w-10 h-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-3">
+          <Search className="w-4 h-4 text-[var(--text-faint)]" />
         </div>
-      )}
+        <p className="text-xs font-semibold text-[var(--text-muted)] mb-1">No results found</p>
+        <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+          Nothing matches <span className="font-semibold text-[var(--text-muted)]">&ldquo;{query}&rdquo;</span>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/15 border border-blue-500/20 flex items-center justify-center mb-4">
+        <MessageSquare className="w-5 h-5 text-blue-400/70" />
+      </div>
+      <p className="text-xs font-semibold text-[var(--text-muted)] mb-1.5">No analyses yet</p>
+      <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+        Start a new analysis to get live odds, props, and AI insights
+      </p>
     </div>
   );
 }
@@ -349,7 +624,13 @@ export function Sidebar({
   isLoadingChats = false,
   onNavigate,
 }: SidebarProps) {
-  const { sidebarOpen, setSidebarOpen, selectedCategory, selectCategory, selectedSport, setSelectedSport, selectedKalshiTopic, setSelectedKalshiTopic } = useAppStore();
+  const {
+    sidebarOpen, setSidebarOpen,
+    selectedCategory, selectCategory,
+    selectedSport, setSelectedSport,
+    selectedKalshiTopic, setSelectedKalshiTopic,
+  } = useAppStore();
+
   const { user } = useUserStore();
   const { setShowUserLightbox } = useModalState();
 
@@ -358,8 +639,9 @@ export function Sidebar({
 
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const SCROLL_KEY = 'sidebar_scroll';
+  const SCROLL_KEY = 'sidebar_scroll_v2';
 
+  // Restore scroll position
   useEffect(() => {
     if (!sidebarOpen || !scrollRef.current) return;
     const saved = sessionStorage.getItem(SCROLL_KEY);
@@ -372,6 +654,7 @@ export function Sidebar({
     }
   }, []);
 
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -380,7 +663,8 @@ export function Sidebar({
 
       if (e.key === '/') {
         e.preventDefault();
-        searchRef.current?.focus();
+        if (!sidebarOpen) setSidebarOpen(true);
+        requestAnimationFrame(() => searchRef.current?.focus());
         return;
       }
       if (e.key === 'Escape') {
@@ -401,20 +685,12 @@ export function Sidebar({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [filteredChats, activeChat, chatSearch, onSelectChat, setChatSearch, setSidebarOpen]);
+  }, [filteredChats, activeChat, chatSearch, onSelectChat, setChatSearch, setSidebarOpen, sidebarOpen]);
 
   const handleSelectChatWithClose = useCallback((id: string) => {
     onSelectChat(id);
     setSidebarOpen(false);
   }, [onSelectChat, setSidebarOpen]);
-
-  const starredChats = filteredChats.filter(c => c.starred);
-  const unstarredChats = filteredChats.filter(c => !c.starred);
-  const dateGroups = mounted
-    ? groupChatsByDate(unstarredChats)
-    : (unstarredChats.length > 0 ? [{ label: 'Recent', chats: unstarredChats }] : []);
-
-  const activeCategory = categories.find(c => c.id === selectedCategory);
 
   function handleCategorySelect(catId: string) {
     selectCategory(catId as AppCategory);
@@ -424,6 +700,14 @@ export function Sidebar({
     setLastUserQuery('');
   }
 
+  const starredChats = filteredChats.filter(c => c.starred);
+  const unstarredChats = filteredChats.filter(c => !c.starred);
+  const dateGroups = mounted
+    ? groupChatsByDate(unstarredChats)
+    : (unstarredChats.length > 0 ? [{ label: 'Recent', chats: unstarredChats }] : []);
+
+  const totalChatCount = filteredChats.length;
+
   return (
     <div
       className={cn(
@@ -432,263 +716,216 @@ export function Sidebar({
         'md:transition-all md:duration-300 md:ease-in-out',
       )}
     >
-      {/* Icon rail — desktop only, collapsed state */}
+      {/* ── Collapsed icon rail (desktop only) ──────────────────────────────── */}
       {!sidebarOpen && (
-        <div className="hidden md:flex flex-col h-full">
-          <IconRail
-            categories={categories}
-            onNewChat={onNewChat}
-            onNavigate={onNavigate}
-          />
+        <div className="hidden md:flex flex-col h-full items-center">
+          <IconRail categories={categories} onNewChat={onNewChat} />
         </div>
       )}
 
-      {/* Full sidebar body */}
+      {/* ── Full sidebar ─────────────────────────────────────────────────────── */}
       <div className={cn('flex flex-col h-full', !sidebarOpen && 'md:hidden')}>
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="px-3 pt-3 pb-2 border-b border-[var(--border-subtle)] bg-[var(--bg-overlay)] space-y-2.5 flex-shrink-0">
-          <button
-            onClick={onNewChat}
-            className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl px-4 py-2.5 transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35 flex items-center justify-center gap-2 font-bold group relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-            <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-            <span className="relative z-10 text-sm">New Analysis</span>
-          </button>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
-            <input
-              ref={searchRef}
-              value={chatSearch}
-              onChange={(e: any) => setChatSearch(e.target.value)}
-              placeholder="Search chats… ( / )"
-              className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg py-2 pl-8 pr-3 text-sm text-[var(--text-muted)] placeholder-[var(--text-faint)] focus:outline-none focus:border-blue-500/50 transition-colors"
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-[var(--border-subtle)]">
+          {/* Branding row */}
+          <div className="flex items-center justify-between px-3 pt-3 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <Zap className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-[13px] font-black tracking-tight text-foreground">
+                Leverage <span className="text-blue-400">AI</span>
+              </span>
+            </div>
+
+            {/* Collapse button */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-surface)] transition-all duration-150 group"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+
+          {/* New Analysis CTA */}
+          <div className="px-3 pb-3">
+            <button
+              onClick={onNewChat}
+              className="w-full relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white px-4 py-2.5 font-bold text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 group"
+            >
+              {/* Shimmer sweep */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out pointer-events-none" />
+              <Plus className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+              <span className="relative z-10">New Analysis</span>
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-3 pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)] pointer-events-none" />
+              <input
+                ref={searchRef}
+                value={chatSearch}
+                onChange={(e: any) => setChatSearch(e.target.value)}
+                placeholder="Search chats…"
+                aria-label="Search chats"
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-default)] focus:border-blue-500/50 rounded-xl py-2 pl-9 pr-8 text-[13px] text-foreground placeholder-[var(--text-faint)] focus:outline-none transition-colors duration-150"
+              />
+              {chatSearch ? (
+                <button
+                  onClick={() => setChatSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-faint)] hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              ) : (
+                <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--text-faint)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded px-1 py-0.5 pointer-events-none">/</kbd>
+              )}
+            </div>
+          </div>
+
+          {/* Category tabs */}
+          <div className="pb-2.5">
+            <div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-faint)] px-3 mb-2">Platform</div>
+            <CategoryTabs
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelect={handleCategorySelect}
             />
           </div>
 
-          {/* Category grid */}
-          <div>
-            <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-2 px-0.5">Platform</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {categories.map(cat => {
-                const Icon = cat.icon;
-                const isActive = selectedCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.id)}
-                    title={cat.desc}
-                    className={cn(
-                      'flex flex-col items-center gap-1 py-2.5 rounded-xl border text-center transition-all duration-200 last:col-span-2',
-                      isActive
-                        ? `bg-[var(--bg-elevated)] border-[var(--border-subtle)] ${cat.color} shadow-sm`
-                        : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] bg-[var(--bg-surface)]/30 hover:bg-[var(--bg-surface)] hover:text-[var(--text-muted)] hover:border-[var(--border-subtle)]',
-                    )}
-                  >
-                    <Icon className={cn(
-                      'w-4 h-4 flex-shrink-0 transition-colors',
-                      isActive ? cat.color : 'text-[var(--text-faint)]',
-                    )} />
-                    <span className="text-[10px] font-bold leading-none">{SHORT_CAT_NAMES[cat.id] ?? cat.name}</span>
-                    <span className={cn(
-                      'text-[8px] leading-none',
-                      isActive ? 'opacity-70' : 'text-[var(--text-faint)] opacity-60',
-                    )}>{cat.desc}</span>
-                  </button>
-                );
-              })}
+          {/* Sport or Kalshi sub-filter */}
+          {selectedCategory !== 'kalshi' && sports.length > 0 && (
+            <div className="pb-3">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-faint)] px-3 mb-2">
+                Sport
+              </div>
+              <SportChips
+                sports={sports}
+                selectedSport={selectedSport}
+                selectedCategory={selectedCategory}
+                onSelect={setSelectedSport}
+              />
             </div>
+          )}
 
-            {/* Sport sub-filter (non-Kalshi) */}
-            {selectedCategory !== 'kalshi' && (
-              <div className="relative mt-2.5">
-                <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Sport</div>
-                <div className="relative">
-                  <div className="absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-[var(--bg-overlay)] to-transparent z-10 pointer-events-none" />
-                  <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-hide pr-8">
-                    {sports
-                      .filter(s => !(['fantasy', 'dfs'].includes(selectedCategory) && s.id.startsWith('ncaa')))
-                      .map(sport => {
-                        const isActive = selectedSport === sport.id;
-                        return (
-                          <button
-                            key={sport.id}
-                            onClick={() => setSelectedSport(isActive ? '' : sport.id)}
-                            className={cn(
-                              'flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0 border',
-                              isActive
-                                ? activeSportColor(selectedCategory)
-                                : sport.isInSeason
-                                  ? 'border-transparent text-[var(--text-muted)] hover:text-foreground hover:bg-[var(--bg-surface)]'
-                                  : 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-faint)] hover:bg-[var(--bg-surface)]',
-                            )}
-                          >
-                            {sport.isInSeason && (
-                              <span className={cn(
-                                'w-1 h-1 rounded-full shrink-0',
-                                isActive ? 'bg-current opacity-70' : 'bg-green-400/70',
-                              )} />
-                            )}
-                            {sport.name}
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Kalshi topic sub-filter */}
-            {selectedCategory === 'kalshi' && (
-              <div className="mt-2.5">
-                <div className="text-[9px] font-bold tracking-widest text-[var(--text-faint)] mb-1.5 px-0.5">Topic</div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    onClick={() => setSelectedKalshiTopic('')}
-                    className={cn(
-                      'px-2.5 py-1.5 rounded-full text-[9px] font-bold transition-all duration-200 border',
-                      selectedKalshiTopic === ''
-                        ? 'bg-cyan-600/25 text-cyan-300 border-cyan-500/40'
-                        : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                    )}
-                  >
-                    All
-                  </button>
-                  {KALSHI_TOPICS.map(topic => (
-                    <button
-                      key={topic}
-                      onClick={() => setSelectedKalshiTopic(selectedKalshiTopic === topic ? '' : topic)}
-                      className={cn(
-                        'px-2.5 py-1.5 rounded-full text-[9px] font-bold transition-all duration-200 border',
-                        selectedKalshiTopic === topic
-                          ? 'bg-cyan-600/25 text-cyan-300 border-cyan-500/40'
-                          : 'border-[var(--border-subtle)]/40 text-[var(--text-faint)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]',
-                      )}
-                    >
-                      {topic}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {selectedCategory === 'kalshi' && (
+            <div className="pb-3">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-faint)] px-3 mb-2">Topic</div>
+              <KalshiTopics
+                selectedTopic={selectedKalshiTopic}
+                onSelect={setSelectedKalshiTopic}
+              />
+            </div>
+          )}
         </div>
 
-        {/* ── Chat list ──────────────────────────────────────────────────── */}
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] space-y-3 custom-scrollbar">
-          {isLoadingChats && (
-            <div className="space-y-1.5 px-1 pt-1" aria-busy="true" aria-label="Loading chats">
-              {[1, 0.8, 0.9, 0.75, 0.85].map((w, i) => (
-                <div key={i} className="relative flex items-center gap-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-[52px] px-3 overflow-hidden">
-                  <div className="w-0.5 h-full absolute left-0 top-0 bg-[var(--border-subtle)] rounded-l-xl" />
-                  <div className="flex-1 space-y-1.5 pl-1">
-                    <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] animate-pulse" style={{ width: `${w * 100}%` }} />
-                    <div className="h-2 rounded-full bg-[var(--bg-surface)] animate-pulse" style={{ width: `${w * 60}%` }} />
+        {/* ── Chat list ─────────────────────────────────────────────────────── */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto py-2 space-y-3 custom-scrollbar pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
+        >
+          {isLoadingChats && <ChatSkeleton />}
+
+          {/* Starred chats */}
+          {!isLoadingChats && starredChats.length > 0 && (
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />
+                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-faint)]">Starred</span>
+                <div className="flex-1 h-px bg-[var(--border-subtle)] opacity-50" />
+                <span className="text-[9px] font-bold text-[var(--text-faint)] tabular-nums opacity-70">{starredChats.length}</span>
+              </div>
+              <div className="px-2 space-y-0.5">
+                {starredChats.map((chat, i) => (
+                  <div
+                    key={chat.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${Math.min(i * 30, 200)}ms` }}
+                  >
+                    <ChatCard
+                      chat={chat}
+                      isActive={activeChat === chat.id}
+                      editingChatId={editingChatId}
+                      editingChatTitle={editingChatTitle}
+                      setEditingChatTitle={setEditingChatTitle}
+                      onEditChatTitle={onEditChatTitle}
+                      onSaveChatTitle={onSaveChatTitle}
+                      onKeyDownChatTitle={onKeyDownChatTitle}
+                      onSelectChat={handleSelectChatWithClose}
+                      onStarChat={onStarChat}
+                      onDeleteChat={onDeleteChat}
+                    />
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
-          {starredChats.length > 0 && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-2 py-1">
-                <div className="flex items-center gap-1.5">
-                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">Starred</span>
-                </div>
-                <span className="text-[9px] font-bold text-[var(--text-faint)]">{starredChats.length}</span>
+          {/* Date-grouped chats */}
+          {!isLoadingChats && dateGroups.map(group => (
+            <div key={group.label} className="space-y-0.5">
+              <SectionHeader label={group.label} count={group.chats.length} />
+              <div className="px-2 space-y-0.5">
+                {group.chats.map((chat, i) => (
+                  <div
+                    key={chat.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${Math.min(i * 30, 200)}ms` }}
+                  >
+                    <ChatCard
+                      chat={chat}
+                      isActive={activeChat === chat.id}
+                      editingChatId={editingChatId}
+                      editingChatTitle={editingChatTitle}
+                      setEditingChatTitle={setEditingChatTitle}
+                      onEditChatTitle={onEditChatTitle}
+                      onSaveChatTitle={onSaveChatTitle}
+                      onKeyDownChatTitle={onKeyDownChatTitle}
+                      onSelectChat={handleSelectChatWithClose}
+                      onStarChat={onStarChat}
+                      onDeleteChat={onDeleteChat}
+                    />
+                  </div>
+                ))}
               </div>
-              {starredChats.map((chat, i) => (
-                <div key={chat.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}>
-                  <ChatCard
-                    chat={chat}
-                    isActive={activeChat === chat.id}
-                    editingChatId={editingChatId}
-                    editingChatTitle={editingChatTitle}
-                    setEditingChatTitle={setEditingChatTitle}
-                    onEditChatTitle={onEditChatTitle}
-                    onSaveChatTitle={onSaveChatTitle}
-                    onKeyDownChatTitle={onKeyDownChatTitle}
-                    onSelectChat={handleSelectChatWithClose}
-                    onStarChat={onStarChat}
-                    onDeleteChat={onDeleteChat}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {dateGroups.map(group => (
-            <div key={group.label} className="space-y-1">
-              <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)]">
-                  {group.label}
-                </span>
-                <span className="text-[9px] font-bold text-[var(--text-faint)]">{group.chats.length}</span>
-              </div>
-              {group.chats.map((chat, i) => (
-                <div key={chat.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 40, 280)}ms` }}>
-                  <ChatCard
-                    chat={chat}
-                    isActive={activeChat === chat.id}
-                    editingChatId={editingChatId}
-                    editingChatTitle={editingChatTitle}
-                    setEditingChatTitle={setEditingChatTitle}
-                    onEditChatTitle={onEditChatTitle}
-                    onSaveChatTitle={onSaveChatTitle}
-                    onKeyDownChatTitle={onKeyDownChatTitle}
-                    onSelectChat={handleSelectChatWithClose}
-                    onStarChat={onStarChat}
-                    onDeleteChat={onDeleteChat}
-                  />
-                </div>
-              ))}
             </div>
           ))}
 
-          {filteredChats.length === 0 && !isLoadingChats && (
-            <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-fade-in">
-              {chatSearch ? (
-                <>
-                  <Search className="w-7 h-7 text-[var(--text-faint)] mb-3 opacity-50" />
-                  <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No results</p>
-                  <p className="text-[10px] text-[var(--text-faint)] opacity-70">
-                    Nothing matches &ldquo;{chatSearch}&rdquo;
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/20 flex items-center justify-center mb-3">
-                    <MessageSquare className="w-5 h-5 text-[var(--text-faint)]" />
-                  </div>
-                  <p className="text-xs font-bold text-[var(--text-faint)] mb-1">No chats yet</p>
-                  <p className="text-[10px] text-[var(--text-faint)] opacity-70">
-                    Start a new analysis above
-                  </p>
-                </>
-              )}
-            </div>
+          {/* Empty state */}
+          {!isLoadingChats && filteredChats.length === 0 && (
+            <EmptyState query={chatSearch} />
           )}
         </div>
 
-        {/* ── User profile footer ────────────────────────────────────────── */}
+        {/* ── User profile footer ──────────────────────────────────────────── */}
         {user && (
           <button
             onClick={() => setShowUserLightbox(true)}
-            className="flex-shrink-0 border-t border-[var(--border-subtle)] px-3 py-2.5 flex items-center gap-2.5 hover:bg-[var(--bg-elevated)] transition-colors group"
+            className="flex-shrink-0 border-t border-[var(--border-subtle)] px-3 py-2.5 flex items-center gap-2.5 hover:bg-[var(--bg-surface)] transition-colors duration-150 group"
+            aria-label="Open profile"
           >
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-transparent group-hover:ring-blue-500/30 transition-all duration-150">
               {user.avatar
-                ? <Image src={user.avatar} className="w-7 h-7 rounded-full object-cover" alt="" width={28} height={28} />
-                : <span className="text-[10px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
+                ? <Image src={user.avatar} className="w-8 h-8 object-cover" alt="" width={32} height={32} />
+                : (
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                    <span className="text-[11px] font-black text-white">{user.name[0]?.toUpperCase()}</span>
+                  </div>
+                )
               }
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <div className="text-xs font-bold text-[var(--foreground)] truncate">{user.name}</div>
-              <div className="text-[9px] text-[var(--text-faint)] truncate">{user.email}</div>
+              <div className="text-[12px] font-bold text-foreground truncate leading-tight">{user.name}</div>
+              <div className="text-[10px] text-[var(--text-faint)] truncate leading-tight">{user.email}</div>
             </div>
+            <ChevronRight className="w-3.5 h-3.5 text-[var(--text-faint)] flex-shrink-0 group-hover:text-[var(--text-muted)] group-hover:translate-x-0.5 transition-all duration-150" />
           </button>
         )}
       </div>

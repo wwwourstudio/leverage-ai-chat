@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { X, Zap, TrendingUp, DollarSign, Target, Wind } from 'lucide-react';
+import { X, Zap, TrendingUp, DollarSign, Target, Wind, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DFSProjection } from './DFSLineupCard';
 

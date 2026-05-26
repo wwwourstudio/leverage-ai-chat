@@ -111,10 +111,15 @@ export const CardLayout = memo(function CardLayout({
   const heroCard = cards[0];
   const rest = cards.slice(1, 7);
 
-  // 1. Status filter
+  // 1. Status filter — 'target' aliases 'optimal', 'sleeper' aliases 'value'
   const afterStatus = filter === 'all'
     ? rest
-    : rest.filter(c => c.status?.toLowerCase() === filter);
+    : rest.filter(c => {
+        const s = c.status?.toLowerCase() ?? '';
+        if (filter === 'optimal') return s === 'optimal' || s === 'target';
+        if (filter === 'value')   return s === 'value'   || s === 'sleeper';
+        return s === filter;
+      });
 
   // 2. Search filter
   const afterSearch = cardSearch.trim()

@@ -147,6 +147,15 @@ export function detectSportFromText(text: string): string | null {
   const t = text.toLowerCase();
   // Kalshi is a prediction market platform — queries on it never need sports-odds routing.
   if (t.includes('kalshi') || t.includes('prediction market')) return null;
+  // Crypto / finance / economics queries are not sports — guard before deep keyword scan.
+  // "price milestone contract" falsely matched ' mil' (Brewers abbreviation) without this guard.
+  if (
+    t.includes('bitcoin') || t.includes(' btc ') || t.includes('ethereum') || t.includes(' eth ') ||
+    t.includes('crypto') || t.includes('blockchain') ||
+    t.includes('fed rate') || t.includes('interest rate') || t.includes('federal reserve') ||
+    t.includes('gdp') || t.includes('inflation rate') || t.includes(' cpi ') ||
+    t.includes('stock market') || t.includes('s&p 500') || t.includes('nasdaq')
+  ) return null;
   // NFBC/NFFC must come first — TSV data can contain "nba" inside player names
   if (t.includes('nfbc') || t.includes('nffc') || t.includes('nfbkc') || t.includes('tgfbi')) return 'mlb';
   // ── NCAA must be checked BEFORE generic sport terms ─────────────────────────

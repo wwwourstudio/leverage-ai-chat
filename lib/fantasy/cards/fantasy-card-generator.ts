@@ -376,8 +376,7 @@ const MLB_PROJECTIONS_2026: GenericPlayer[] = [
   { name: 'William Contreras',     team: 'MIL', pos: 'C',  pts: 30.2, adp: 51.4 },
   { name: 'Will Smith',            team: 'LAD', pos: 'C',  pts: 29.4, adp: 50.3 },
   // SPs
-  { name: 'Tarik Skubal',          team: 'DET', pos: 'SP', pts: 43.2, adp: 7.3  },
-  { name: 'Paul Skenes',           team: 'PIT', pos: 'SP', pts: 41.4, adp: 11.3 },
+  { name: 'Paul Skenes',           team: 'PIT', pos: 'SP', pts: 43.2, adp: 7.3  },
   { name: 'Garrett Crochet',       team: 'BOS', pos: 'SP', pts: 39.6, adp: 13.2 },
   { name: 'Zack Wheeler',          team: 'PHI', pos: 'SP', pts: 38.8, adp: 24.1 },
   { name: 'Gerrit Cole',           team: 'NYY', pos: 'SP', pts: 36.4, adp: 10.1 },

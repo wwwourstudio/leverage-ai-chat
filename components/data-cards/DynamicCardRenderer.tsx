@@ -81,9 +81,9 @@ const EXACT_STD_REGISTRY: Record<string, React.ComponentType<any>> = {
   closing_line_card:    ClosingLineCard,
 };
 
-const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: React.ComponentType<any> }> = [
+const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: React.ComponentType<any>; skipBookmark?: boolean }> = [
   { test: t => t.includes('dfs') || t.includes('lineup'),                                                                              Component: DFSCard },
-  { test: t => t.includes('fantasy') || t.includes('draft') || t.includes('sleeper'),                                                 Component: FantasyCard },
+  { test: t => t.includes('fantasy') || t.includes('draft') || t.includes('sleeper'),                                                 Component: FantasyCard, skipBookmark: true },
   { test: t => t.includes('kalshi') || t.includes('prediction'),                                                                      Component: KalshiCard },
   { test: t => t.includes('weather') || t.includes('climate'),                                                                        Component: WeatherCard },
   { test: t => t === 'adp-analysis' || t.includes('adp'),                                                                             Component: ADPCard },
@@ -637,8 +637,8 @@ export function DynamicCardRenderer({
 
   // ── Standard registry lookup (exact → pattern → fallback) ─────────────────
   if (cardType in EXACT_STD_REGISTRY) return renderStd(EXACT_STD_REGISTRY[cardType]);
-  for (const { test, Component } of PATTERN_STD_REGISTRY) {
-    if (test(cardType)) return renderStd(Component);
+  for (const { test, Component, skipBookmark } of PATTERN_STD_REGISTRY) {
+    if (test(cardType)) return renderStd(Component, skipBookmark);
   }
   if (process.env.NODE_ENV === 'development') {
     console.warn(`[DynamicCardRenderer] Unknown card type "${safeCard.type}" — falling back to BettingCard.`);

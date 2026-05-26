@@ -383,12 +383,13 @@ function TabStats({ metrics, trendNote, conf }: {
 
 // ── Tab 1: Advanced ───────────────────────────────────────────────────────────
 
-function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
+function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
   metrics: Metric[];
   data: Record<string, any>;
   seasonStats?: SeasonStats;
   gameLog: GameLogEntry[];
   conf: TypeConf;
+  isHitter?: boolean;
 }) {
   const extraMetrics = metrics.slice(3);
   const hasPitchMix  = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
@@ -470,12 +471,17 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
           <div className="grid grid-cols-4 gap-1.5">
-            {[
-              { label: 'ERA', val: seasonStats.era ?? '--', hi: true },
-              { label: 'K',   val: String(seasonStats.k ?? 0), hi: true },
-              { label: 'BB',  val: String(seasonStats.bb ?? 0), hi: false },
-              { label: 'G',   val: String(seasonStats.gamesPlayed), hi: false },
-            ].map((s, i) => (
+            {isHitter ? [
+              { label: 'AVG', val: seasonStats.avg ?? '--' },
+              { label: 'HR',  val: String(seasonStats.hr ?? 0) },
+              { label: 'RBI', val: String(seasonStats.rbi ?? 0) },
+              { label: 'SB',  val: String(seasonStats.sb ?? 0) },
+            ] : [
+              { label: 'ERA', val: seasonStats.era ?? '--' },
+              { label: 'K',   val: String(seasonStats.k ?? 0) },
+              { label: 'BB',  val: String(seasonStats.bb ?? 0) },
+              { label: 'G',   val: String(seasonStats.gamesPlayed) },
+            ]).map((s, i) => (
               <StatTile key={i} label={s.label} value={s.val} accentText={conf.accentText} />
             ))}
           </div>
@@ -490,23 +496,26 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
           <div className="flex items-center gap-1.5 mb-3">
             <span className="text-[8px] text-[var(--foreground)]/25 uppercase tracking-widest">Form</span>
             {gameLog.slice(0, 5).map((g, i) => {
-              const er = g.er ?? 0;
-              const ip = parseFloat(g.ip ?? '0');
-              const isQS = ip >= 6 && er <= 3;
-              const isBad = er >= 4;
+              const isGood = isHitter ? (g.h ?? 0) >= 2 || (g.hr ?? 0) >= 1 : (parseFloat(g.ip ?? '0') >= 6 && (g.er ?? 0) <= 3);
+              const isBad  = isHitter ? (g.h ?? 0) === 0 && (g.ab ?? 0) >= 3    : (g.er ?? 0) >= 4;
+              const label  = isHitter
+                ? ((g.hr ?? 0) >= 1 ? 'HR' : (g.h ?? 0) >= 2 ? 'H' : '·')
+                : (isGood ? 'Q' : isBad ? '✗' : '·');
               return (
                 <div
                   key={i}
                   className="w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center text-[8px] font-black animate-fade-in-up"
-                  title={`${g.date} vs ${g.opp}: ${g.ip ?? '?'} IP, ${g.k ?? 0} K, ${er} ER`}
+                  title={isHitter
+                    ? `${g.date} vs ${g.opp}: ${g.h ?? 0}/${g.ab ?? 0}, ${g.hr ?? 0} HR, ${g.rbi ?? 0} RBI`
+                    : `${g.date} vs ${g.opp}: ${g.ip ?? '?'} IP, ${g.k ?? 0} K, ${g.er ?? 0} ER`}
                   style={{
-                    background: isQS ? 'rgba(74,222,128,0.2)' : isBad ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
-                    border: `1px solid ${isQS ? 'rgba(74,222,128,0.4)' : isBad ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.3)'}`,
-                    color: isQS ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
+                    background: isGood ? 'rgba(74,222,128,0.2)' : isBad ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
+                    border: `1px solid ${isGood ? 'rgba(74,222,128,0.4)' : isBad ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.3)'}`,
+                    color: isGood ? '#4ade80' : isBad ? '#f87171' : '#fbbf24',
                     animationDelay: `${i * 60}ms`,
                   }}
                 >
-                  {isQS ? 'Q' : isBad ? '✗' : '·'}
+                  {label}
                 </div>
               );
             })}
@@ -516,40 +525,39 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
           {/* Game log table */}
           <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden">
             <div className="grid px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]"
-              style={{ gridTemplateColumns: '1fr 40px 32px 28px 28px 28px' }}>
-              {['Date', 'Opp', 'IP', 'K', 'ER', 'BB'].map(h => (
+              style={{ gridTemplateColumns: isHitter ? '1fr 40px 28px 28px 28px 28px' : '1fr 40px 32px 28px 28px 28px' }}>
+              {(isHitter ? ['Date', 'Opp', 'AB', 'H', 'HR', 'RBI'] : ['Date', 'Opp', 'IP', 'K', 'ER', 'BB']).map(h => (
                 <span key={h} className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] text-right first:text-left">{h}</span>
               ))}
             </div>
-            {gameLog.map((g, i) => {
-              const ip = parseFloat(g.ip ?? '0');
-              const isQS = ip >= 6 && (g.er ?? 0) <= 3;
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    'grid px-3 py-2 border-b border-[var(--border-subtle)] last:border-0',
-                    i % 2 === 1 && 'bg-white/[0.015]',
-                  )}
-                  style={{ gridTemplateColumns: '1fr 40px 32px 28px 28px 28px' }}
-                >
-                  <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">
-                    {g.date}
-                    {isQS && <span className="ml-1 text-[7px] font-black text-blue-400">QS</span>}
-                  </span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
-                  <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ip ?? '—'}</span>
-                  <span className="text-[10px] font-black text-blue-400 text-right">{g.k ?? '—'}</span>
-                  <span className={cn(
-                    'text-[10px] font-black text-right',
-                    (g.er ?? 0) === 0 ? 'text-blue-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400',
-                  )}>
-                    {g.er ?? '—'}
-                  </span>
-                  <span className="text-[10px] text-[var(--text-faint)] text-right">{g.bb ?? '—'}</span>
-                </div>
-              );
-            })}
+            {gameLog.map((g, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'grid px-3 py-2 border-b border-[var(--border-subtle)] last:border-0',
+                  i % 2 === 1 && 'bg-white/[0.015]',
+                )}
+                style={{ gridTemplateColumns: isHitter ? '1fr 40px 28px 28px 28px 28px' : '1fr 40px 32px 28px 28px 28px' }}
+              >
+                <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">{g.date}</span>
+                <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
+                {isHitter ? (
+                  <>
+                    <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ab ?? '—'}</span>
+                    <span className={cn('text-[10px] font-black text-right', (g.h ?? 0) >= 2 ? 'text-blue-400' : 'text-[var(--text-faint)]')}>{g.h ?? '—'}</span>
+                    <span className={cn('text-[10px] font-black text-right', (g.hr ?? 0) > 0 ? 'text-amber-400' : 'text-[var(--text-faint)]')}>{g.hr ?? '—'}</span>
+                    <span className="text-[10px] text-[var(--text-faint)] text-right">{g.rbi ?? '—'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ip ?? '—'}</span>
+                    <span className="text-[10px] font-black text-blue-400 text-right">{g.k ?? '—'}</span>
+                    <span className={cn('text-[10px] font-black text-right', (g.er ?? 0) === 0 ? 'text-blue-400' : (g.er ?? 0) <= 2 ? 'text-amber-400' : 'text-rose-400')}>{g.er ?? '—'}</span>
+                    <span className="text-[10px] text-[var(--text-faint)] text-right">{g.bb ?? '—'}</span>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -559,10 +567,11 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf }: {
 
 // ── Tab 2: Props ──────────────────────────────────────────────────────────────
 
-function TabProps({ data, propLines, onAnalyze }: {
+function TabProps({ data, propLines, onAnalyze, isHitter }: {
   data: Record<string, any>;
   propLines: PropLine[];
   onAnalyze?: () => void;
+  isHitter?: boolean;
 }) {
   const fmtOdds = (o: number) => (o > 0 ? `+${o}` : String(o));
   const barWidth = (pct: number) => Math.min(100, Math.max(4, pct));
@@ -658,14 +667,16 @@ function TabProps({ data, propLines, onAnalyze }: {
         <div className="w-10 h-10 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
           <Zap className="w-5 h-5 text-[var(--text-faint)]" />
         </div>
-        <p className="text-[11px] text-[var(--text-faint)]">Live prop lines load when game is scheduled</p>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {isHitter ? 'Live batting prop lines load when game is scheduled' : 'Live prop lines load when game is scheduled'}
+        </p>
         {onAnalyze && (
           <button
             onClick={onAnalyze}
             className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-400 text-[10px] font-black hover:bg-blue-500/20 transition-colors"
           >
             <Zap className="w-3 h-3" />
-            Ask AI for K Prop Analysis
+            {isHitter ? 'Ask AI for Prop Analysis' : 'Ask AI for K Prop Analysis'}
           </button>
         )}
       </div>
@@ -697,7 +708,9 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
   const { watched, toggle: toggleWatch } = useWatchlist(playerName);
 
+  // statcast_summary_card is used for both pitchers and hitters; detect via subcategory
   const isPitcherCard = cardType === 'statcast_summary_card';
+  const isHitter = isPitcherCard && (data.subcategory ?? '').toLowerCase().includes('hitter');
 
   return (
     <>
@@ -759,7 +772,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* Watchlist bookmark */}
-            {isPitcherCard && (
+            {isPitcherCard && !isHitter && (
               <button
                 onClick={toggleWatch}
                 title={watched ? 'Remove bookmark' : 'Bookmark player'}
@@ -803,10 +816,10 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
               <TabStats metrics={data.summary_metrics} trendNote={data.trend_note} conf={conf} />
             )}
             {activeTab === 1 && (
-              <TabAdvanced metrics={data.summary_metrics ?? []} data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} />
+              <TabAdvanced metrics={data.summary_metrics ?? []} data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} isHitter={isHitter} />
             )}
             {activeTab === 2 && (
-              <TabProps data={data.data ?? {}} propLines={propLines} onAnalyze={onAnalyze} />
+              <TabProps data={data.data ?? {}} propLines={propLines} onAnalyze={onAnalyze} isHitter={isHitter} />
             )}
           </>
         ) : (

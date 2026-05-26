@@ -547,7 +547,7 @@ function KalshiTopics({
 }) {
   return (
     <div className="px-3">
-      <div className="flex flex-wrap gap-1">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
         {KALSHI_TOPICS.map(topic => {
           const isActive = topic === 'All' ? selectedTopic === '' : selectedTopic === topic;
           return (

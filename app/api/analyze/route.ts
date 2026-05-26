@@ -394,6 +394,12 @@ export async function POST(request: NextRequest) {
         cardFetchPromise = import('@/lib/cards/kalshi-generator')
           .then(({ kalshiMarketsToGroupedCard, inferKalshiSub }) => {
             const markets = kalshiPromptMarkets ?? [];
+            // Guard: never call kalshiMarketsToGroupedCard with an empty array — it creates a
+            // card with data.markets=[] which KalshiCard renders as "temporarily unavailable".
+            // Fall through to generateContextualCards so the full fetch pipeline runs instead.
+            if (markets.length === 0) {
+              return generateContextualCards('kalshi', context.sport ?? undefined, 6, false, context.kalshiSubcategory).catch(() => []);
+            }
             const sub = context.kalshiSubcategory || inferKalshiSub(userMessage.toLowerCase()) || 'trending';
             const grouped = kalshiMarketsToGroupedCard(markets, sub);
             console.log(`[KALSHI] Cards from prompt bridge: 1 grouped ${sub} card (${markets.length} markets)`);

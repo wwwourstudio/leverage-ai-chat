@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware';
 
 type SystemStatus = 'ok' | 'degraded' | 'down';
 export type AppCategory = 'all' | 'betting' | 'kalshi' | 'dfs' | 'fantasy' | 'props';
+export type CardSortBy = 'default' | 'value' | 'time' | 'alpha';
 
 interface AppStore {
   // Sidebar
@@ -28,6 +29,16 @@ interface AppStore {
   // Banners
   kalshiBettingBannerVisible: boolean;
   setKalshiBettingBannerVisible: (v: boolean) => void;
+  // Card filtering / sorting (cardSearch is NOT persisted — session only)
+  cardSortBy: CardSortBy;
+  cardSearch: string;
+  setCardSortBy: (v: CardSortBy) => void;
+  setCardSearch: (v: string) => void;
+  // Live card connection state (set by useCardRefresh hook)
+  cardLiveSubscribed: boolean;
+  cardLiveRefreshAt: number | null;
+  setCardLiveSubscribed: (v: boolean) => void;
+  setCardLiveRefreshAt: (v: number | null) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -40,6 +51,10 @@ export const useAppStore = create<AppStore>()(
       systemStatus: 'ok',
       deepThink: false,
       kalshiBettingBannerVisible: false,
+      cardSortBy: 'default' as CardSortBy,
+      cardSearch: '',
+      cardLiveSubscribed: false,
+      cardLiveRefreshAt: null,
 
       setSidebarOpen: (v) => set({ sidebarOpen: v }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -50,6 +65,10 @@ export const useAppStore = create<AppStore>()(
       setSystemStatus: (v) => set({ systemStatus: v }),
       toggleDeepThink: () => set((s) => ({ deepThink: !s.deepThink })),
       setKalshiBettingBannerVisible: (v) => set({ kalshiBettingBannerVisible: v }),
+      setCardSortBy: (v) => set({ cardSortBy: v }),
+      setCardSearch: (v) => set({ cardSearch: v }),
+      setCardLiveSubscribed: (v) => set({ cardLiveSubscribed: v }),
+      setCardLiveRefreshAt: (v) => set({ cardLiveRefreshAt: v }),
     }),
     {
       name: 'leverage-app-prefs',
@@ -58,6 +77,9 @@ export const useAppStore = create<AppStore>()(
         selectedSport: state.selectedSport,
         selectedKalshiTopic: state.selectedKalshiTopic,
         deepThink: state.deepThink,
+        cardSortBy: state.cardSortBy,
+        // cardSearch intentionally excluded — session only
+        // live state intentionally excluded — reset each session
       }),
     },
   ),

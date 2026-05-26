@@ -753,3 +753,57 @@
 
 .font-bebas { font-family: var(--font-bebas, impact, sans-serif); letter-spacing: 0.02em; }
 .font-dm-mono { font-family: var(--font-dm-mono, ui-monospace, monospace); }
+
+/* ── Card enhancement animations ────────────────────────────────────────── */
+
+@keyframes bookmark-spring {
+  0%   { transform: scale(1) rotate(0deg); }
+  40%  { transform: scale(1.35) rotate(-8deg); }
+  70%  { transform: scale(0.9) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@utility animate-bookmark-spring {
+  animation: bookmark-spring 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes value-changed {
+  0%   { box-shadow: 0 0 0 0 oklch(0.80 0.20 85 / 0); }
+  30%  { box-shadow: 0 0 0 3px oklch(0.80 0.20 85 / 0.35); }
+  100% { box-shadow: 0 0 0 0 oklch(0.80 0.20 85 / 0); }
+}
+@utility animate-value-changed {
+  animation: value-changed 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes card-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-8px) scale(0.97); }
+}
+@utility animate-card-exit {
+  animation: card-exit 200ms ease-in both;
+}
+
+@keyframes swipe-hint-from-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@utility animate-swipe-hint-right {
+  animation: swipe-hint-from-right 120ms ease-out both;
+}
+
+@keyframes swipe-hint-from-left {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@utility animate-swipe-hint-left {
+  animation: swipe-hint-from-left 120ms ease-out both;
+}
+
+@keyframes history-panel-open {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 280px; opacity: 1; }
+}
+@utility animate-history-open {
+  animation: history-panel-open 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+}

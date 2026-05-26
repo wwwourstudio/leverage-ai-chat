@@ -30,6 +30,11 @@ const CARDS_TTL = CACHE_CONFIG.CARDS_TTL;
 const cache = new TtlCache<any>(100);
 const inflightRequests = new Map<string, Promise<DynamicCard[]>>();
 
+/** Invalidate all cached card results (called by useCardRefresh on live data events). */
+export function invalidateCardsCache(): void {
+  cache.clear('cards:');
+}
+
 async function safeJsonParse(response: Response): Promise<any> {
   const text = await response.text();
 

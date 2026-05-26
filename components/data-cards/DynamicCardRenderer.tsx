@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import { FlaskConical } from 'lucide-react';
+import {
+  FlaskConical, BookmarkPlus, BookmarkCheck,
+  Share2, Check, History, Sparkles,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { CardData } from '@/lib/types';
+import { useToast } from '@/components/toast-provider';
+import { CardHistoryPanel } from './CardHistoryPanel';
 
 // ── Saved-card entry (shared with WatchlistLightbox) ──────────────────────────
 export interface SavedCardEntry {
@@ -96,6 +103,8 @@ interface DynamicCardRendererProps {
   isHero?: boolean;
   trustScore?: number;
   trustLevel?: 'high' | 'medium' | 'low';
+  /** Timestamp that increments on real-time refresh; triggers amber flash animation. */
+  refreshKey?: number;
 }
 
 const STATS_CARD_TYPES = new Set([
@@ -125,6 +134,7 @@ export function DynamicCardRenderer({
   isHero = false,
   trustScore,
   trustLevel,
+  refreshKey,
 }: DynamicCardRendererProps) {
   // Loading state
   if (isLoading) {
@@ -157,28 +167,15 @@ export function DynamicCardRenderer({
     metadata: card.metadata,
   };
 
-  // Suppress cards with no meaningful data payload. A card is considered empty
-  // when every field in `data` is null/undefined or one of the housekeeping keys
-  // (`realData`, `status`). Prevents the user from seeing a card shell full of
-  // "—" placeholders when a generator regression emits a card without data.
+  // Suppress cards with no meaningful data payload.
   const meaningfulKeys = Object.keys(safeCard.data).filter(
     k => k !== 'realData' && k !== 'status' && safeCard.data[k] != null && safeCard.data[k] !== '',
   );
-  // Statcast-type cards store their metrics at the top level (summary_metrics, lightbox),
-  // not inside the data object — skip the empty-data check for them.
   const isStatcastType = STATS_CARD_TYPES.has(card.type) || card.type?.includes('statcast') || card.type?.includes('simulation');
   const hasTopLevelMetrics = isStatcastType && Array.isArray(card.summary_metrics);
   if (meaningfulKeys.length === 0 && !hasTopLevelMetrics) {
-    if (safeCard.realData === false) {
-      // Simulated/fallback card with no data — safe to suppress
-      return null;
-    }
-    // Live card (realData true/undefined) with empty payload — let the card component
-    // render its own empty/error state rather than silently hiding it
-    console.warn(
-      '[v0] [DynamicCardRenderer] Live card has empty data payload:',
-      safeCard.type, '/', safeCard.title,
-    );
+    if (safeCard.realData === false) return null;
+    console.warn('[v0] [DynamicCardRenderer] Live card has empty data payload:', safeCard.type, '/', safeCard.title);
   }
 
   // Hide explicit no-games placeholders and offseason stubs
@@ -192,27 +189,32 @@ export function DynamicCardRenderer({
 
   const handleAnalyze = onAnalyze ? () => onAnalyze(card) : undefined;
 
-  // Whether this card has real live data or is estimated/fallback
   const isEstimated = safeCard.realData === false;
   const hasTrustOverlay = trustScore !== undefined;
 
-  // Data staleness: show "Updated X ago" when fetchedAt is in metadata
   const fetchedAt: string | undefined = (safeCard.metadata as Record<string, unknown> | undefined)?.fetchedAt as string | undefined;
   const dataAgeLabel = (() => {
     if (!fetchedAt || isEstimated) return null;
     const ageMs = Date.now() - new Date(fetchedAt).getTime();
     const mins = Math.floor(ageMs / 60_000);
-    if (mins < 1) return null; // < 1 min: don't show (fresh enough)
+    if (mins < 1) return null;
     if (mins < 60) return `${mins}m ago`;
     return `${Math.floor(mins / 60)}h ago`;
   })();
 
-  // Per-card bookmark/pin state (persisted to localStorage)
+  // ── Hooks (must remain after early returns to preserve existing behavior) ───
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const { addToast } = useToast();
+
+  // Bookmark / pin state
   const bookmarkKey = `bookmark:${safeCard.type}:${safeCard.title}`;
   const cardId = `${safeCard.type}:${safeCard.title}`;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [isBookmarked, setIsBookmarked] = useState(() => {
     try { return !!localStorage.getItem(bookmarkKey); } catch { return false; }
   });
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const toggleBookmark = useCallback(() => {
     setIsBookmarked(prev => {
       const next = !prev;
@@ -224,18 +226,105 @@ export function DynamicCardRenderer({
           : existing.filter(e => e.id !== cardId);
         localStorage.setItem(SAVED_CARDS_KEY, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent('saved-cards-update', { detail: { count: updated.length } }));
-        // Notify CardLayout to re-sort pinned cards to top
         window.dispatchEvent(new CustomEvent('card-pin-update'));
       } catch {}
       return next;
     });
   }, [bookmarkKey, cardId, safeCard]);
 
+  // Sharing state
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [sharing, setSharing] = useState(false);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const handleShare = useCallback(async () => {
+    const sportEmojis: Record<string, string> = { nba: '🏀', nfl: '🏈', mlb: '⚾', nhl: '🏒' };
+    const emoji = sportEmojis[safeCard.category?.toLowerCase()] ?? '📊';
+    const pairs = Object.entries(safeCard.data)
+      .filter(([k, v]) => k !== 'realData' && k !== 'status' && typeof v !== 'object' && v != null)
+      .slice(0, 4)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
+    const text = `${emoji} ${safeCard.title}\n${safeCard.category} · ${safeCard.subcategory}\n${pairs.join(' · ')}\n\nvia Leverage AI`;
+    setSharing(true);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: safeCard.title, text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        addToast('Copied to clipboard');
+      }
+    } catch { /* user dismissed */ }
+    finally { setTimeout(() => setSharing(false), 1500); }
+  }, [safeCard, addToast]);
 
-  // Historical comparison: compare current data to the last snapshot for this card type+title.
-  // Detects numeric field movements so we can show ↑/↓ "Updated" badges.
+  // History panel visibility
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Mobile swipe + long-press state
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [swipeHint, setSwipeHint] = useState<'left' | 'right' | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(10);
+      setShowQuickActions(true);
+      touchStartRef.current = null;
+    }, 300);
+  }, []);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    clearTimeout(longPressTimerRef.current!);
+    const dx = e.touches[0].clientX - touchStartRef.current.x;
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+    if (Math.abs(dx) > 24 && Math.abs(dx) > dy * 1.5) {
+      setSwipeHint(dx > 0 ? 'right' : 'left');
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    clearTimeout(longPressTimerRef.current!);
+    setSwipeHint(null);
+    if (!touchStartRef.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+    touchStartRef.current = null;
+    if (Math.abs(dx) < 72 || Math.abs(dx) <= dy * 1.5) return;
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(10);
+    if (dx > 0) toggleBookmark(); else handleShare();
+  }, [toggleBookmark, handleShare]);
+
+  // Value-changed flash animation (triggered by refreshKey prop changing)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [flashValue, setFlashValue] = useState(false);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const prevRefreshKeyRef = useRef(refreshKey);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey !== prevRefreshKeyRef.current) {
+      prevRefreshKeyRef.current = refreshKey;
+      setFlashValue(true);
+      const t = setTimeout(() => setFlashValue(false), 800);
+      return () => clearTimeout(t);
+    }
+  }, [refreshKey]);
+
+  // Historical comparison: compare current data to last snapshot + maintain rolling history
   const HIST_KEY = `chist:${safeCard.type}:${safeCard.title}`;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [deltaDir, setDeltaDir] = useState<'up' | 'down' | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     try {
       const raw = localStorage.getItem(HIST_KEY);
@@ -252,60 +341,181 @@ export function DynamicCardRenderer({
         if (ups + downs > 0) setDeltaDir(ups >= downs ? 'up' : 'down');
       }
       localStorage.setItem(HIST_KEY, JSON.stringify(safeCard.data));
+
+      // Maintain rolling 5-snapshot history for CardHistoryPanel
+      const histKey = `card_history:${safeCard.type}:${safeCard.title}`;
+      const existing = JSON.parse(localStorage.getItem(histKey) ?? '[]') as Array<{ ts: string; data: Record<string, any> }>;
+      const updated = [{ ts: new Date().toISOString(), data: safeCard.data }, ...existing].slice(0, 5);
+      localStorage.setItem(histKey, JSON.stringify(updated));
     } catch {}
-    // Intentionally runs only on mount — safeCard.data is stable per render
+    // Intentionally runs only on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live indicator: shown on cards with confirmed real data (not estimated)
   const isLive = safeCard.realData === true;
 
-  // Wraps any card element with ESTIMATED badge, trust score chip, pin and share buttons.
-  // Pass skipBookmark=true for card types that have their own save/watch mechanism.
+  // ── withOverlays: wraps any card with overlay badges + interactive buttons ──
+
   function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
     return (
-      <div className="relative group/card animate-card-enter" style={{ animationDelay: `${Math.min((index ?? 0) * 60, 300)}ms` }}>
-        {el}
+      <>
+        <div
+          className={cn(
+            'relative group/card animate-card-enter',
+            flashValue && 'animate-value-changed',
+          )}
+          style={{ animationDelay: `${Math.min((index ?? 0) * 60, 300)}ms` }}
+          onTouchStart={!skipBookmark ? handleTouchStart : undefined}
+          onTouchMove={!skipBookmark ? handleTouchMove : undefined}
+          onTouchEnd={!skipBookmark ? handleTouchEnd : undefined}
+        >
+          {el}
 
-        {isEstimated && (
-          <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
-            <FlaskConical className="w-3 h-3" aria-hidden="true" />
-            Estimated
-          </span>
+          {/* Swipe hints (mobile) */}
+          {!skipBookmark && swipeHint === 'right' && (
+            <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center bg-blue-500/10 rounded-r-[var(--ui-radius-card,12px)] animate-swipe-hint-right pointer-events-none z-20">
+              <BookmarkPlus className="w-5 h-5 text-blue-400" />
+            </div>
+          )}
+          {!skipBookmark && swipeHint === 'left' && (
+            <div className="absolute inset-y-0 left-0 w-16 flex items-center justify-center bg-purple-500/10 rounded-l-[var(--ui-radius-card,12px)] animate-swipe-hint-left pointer-events-none z-20">
+              <Share2 className="w-5 h-5 text-purple-400" />
+            </div>
+          )}
+
+          {/* Bookmark button */}
+          {!skipBookmark && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleBookmark(); }}
+              aria-label={isBookmarked ? 'Unpin card' : 'Pin card'}
+              className={cn(
+                'absolute z-10 w-7 h-7 rounded-full flex items-center justify-center',
+                'opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 transition-all duration-150',
+                isEstimated ? 'top-9 right-2' : 'top-2 right-2',
+                isBookmarked
+                  ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400 animate-bookmark-spring'
+                  : 'bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-foreground',
+              )}
+            >
+              {isBookmarked
+                ? <BookmarkCheck className="w-3.5 h-3.5" />
+                : <BookmarkPlus className="w-3.5 h-3.5" />
+              }
+            </button>
+          )}
+
+          {/* Share button */}
+          {!skipBookmark && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleShare(); }}
+              aria-label="Share card"
+              className={cn(
+                'absolute z-10 w-7 h-7 rounded-full flex items-center justify-center',
+                'opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 transition-all duration-150',
+                isEstimated ? 'top-9 right-10' : 'top-2 right-10',
+                sharing
+                  ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400'
+                  : 'bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-foreground',
+              )}
+            >
+              {sharing ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+            </button>
+          )}
+
+          {/* History toggle button */}
+          {!skipBookmark && (
+            <button
+              onClick={() => setShowHistory(p => !p)}
+              aria-label={showHistory ? 'Hide history' : 'Show history'}
+              className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[var(--bg-overlay)]/80 border border-[var(--border-subtle)] text-[var(--text-faint)] opacity-0 group-hover/card:opacity-100 transition-all duration-150 whitespace-nowrap"
+            >
+              <History className="w-2.5 h-2.5" />
+              {showHistory ? 'Hide' : 'History'}
+            </button>
+          )}
+
+          {/* ESTIMATED badge */}
+          {isEstimated && (
+            <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
+              <FlaskConical className="w-3 h-3" aria-hidden="true" />
+              Estimated
+            </span>
+          )}
+
+          {/* Bottom-right: data age label */}
+          {dataAgeLabel && !isEstimated && (
+            <span className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded text-[8px] font-semibold tabular-nums bg-[var(--bg-overlay)]/80 text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
+              {dataAgeLabel}
+            </span>
+          )}
+
+          {/* Bottom-left: trust score + historical delta badge side-by-side */}
+          {(hasTrustOverlay || deltaDir) && (
+            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 pointer-events-none">
+              {hasTrustOverlay && (
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)]">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    trustLevel === 'high' ? 'bg-blue-400' :
+                    trustLevel === 'medium' ? 'bg-yellow-400' :
+                    'bg-red-400'
+                  }`} />
+                  <span className="text-[8px] font-bold text-[var(--text-faint)]">{trustScore}%</span>
+                </div>
+              )}
+              {deltaDir && (
+                <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold border backdrop-blur-sm ${
+                  deltaDir === 'up'
+                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                    : 'bg-red-500/10 border-red-500/20 text-red-400'
+                }`} aria-label={`Data ${deltaDir === 'up' ? 'increased' : 'decreased'} since last view`}>
+                  {deltaDir === 'up' ? '↑' : '↓'} Updated
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* History panel — rendered outside the card div to avoid clip issues */}
+        {!skipBookmark && showHistory && (
+          <CardHistoryPanel
+            cardKey={`${safeCard.type}:${safeCard.title}`}
+            currentData={safeCard.data}
+          />
         )}
 
-        {/* Bottom-right: data age label */}
-        {dataAgeLabel && !isEstimated && (
-          <span className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded text-[8px] font-semibold tabular-nums bg-[var(--bg-overlay)]/80 text-[var(--text-faint)] border border-[var(--border-subtle)] backdrop-blur-sm pointer-events-none">
-            {dataAgeLabel}
-          </span>
-        )}
-
-        {/* Bottom-left: trust score + historical delta badge side-by-side */}
-        {(hasTrustOverlay || deltaDir) && (
-          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 pointer-events-none">
-            {hasTrustOverlay && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-overlay)]/80 backdrop-blur-sm border border-[var(--border-subtle)]">
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  trustLevel === 'high' ? 'bg-blue-400' :
-                  trustLevel === 'medium' ? 'bg-yellow-400' :
-                  'bg-red-400'
-                }`} />
-                <span className="text-[8px] font-bold text-[var(--text-faint)]">{trustScore}%</span>
+        {/* Quick-action bottom sheet (mobile long-press) */}
+        {!skipBookmark && showQuickActions && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowQuickActions(false)}
+          >
+            <div
+              className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-t-2xl p-4 pb-8 space-y-1 animate-slide-up"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="text-[10px] font-black text-[var(--text-faint)] uppercase tracking-wider mb-3 px-1 truncate">
+                {safeCard.title}
               </div>
-            )}
-            {deltaDir && (
-              <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold border backdrop-blur-sm ${
-                deltaDir === 'up'
-                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                  : 'bg-red-500/10 border-red-500/20 text-red-400'
-              }`} aria-label={`Data ${deltaDir === 'up' ? 'increased' : 'decreased'} since last view`}>
-                {deltaDir === 'up' ? '↑' : '↓'} Updated
-              </span>
-            )}
-          </div>
+              {([
+                { Icon: Sparkles, label: 'Analyze', action: handleAnalyze },
+                { Icon: Share2,   label: 'Share',   action: handleShare },
+                { Icon: isBookmarked ? BookmarkCheck : BookmarkPlus, label: isBookmarked ? 'Unpin' : 'Pin', action: toggleBookmark },
+                { Icon: History,  label: showHistory ? 'Hide History' : 'History', action: () => setShowHistory(p => !p) },
+              ] as const).map(({ Icon, label, action }) => (
+                <button
+                  key={label}
+                  onClick={() => { action?.(); setShowQuickActions(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors text-left"
+                >
+                  <Icon className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
+                  <span className="text-sm font-semibold text-foreground">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
         )}
-      </div>
+      </>
     );
   }
 
@@ -334,23 +544,18 @@ export function DynamicCardRenderer({
 
   // ── Cards with unique prop shapes (handled before registry lookup) ────────
 
-  // HR Prediction: exact match before 'prediction' catch-all in pattern registry
   if (cardType === 'hr_prediction_card')
     return withOverlays(<HRPredictionCard data={card.data as any} />);
 
-  // VPE 3.0 — merges safeCard + raw card for nested data fields
   if (cardType === 'vpe_projection_card')
     return withOverlays(<VPECard card={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} />);
 
-  // MLB Projections — same merge pattern as VPE
   if (cardType === 'mlb_projection_card')
     return withOverlays(<MLBProjectionCard data={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // Statcast — skipBookmark only when type string contains 'statcast'
   if (cardType.includes('statcast') || cardType === 'hr_prop_card' || cardType.includes('simulation') || cardType === 'leaderboard_card' || cardType === 'pitch_analysis_card')
     return withOverlays(<StatcastCard data={{ ...safeCard, ...(card as any) } as any} onAnalyze={handleAnalyze} isHero={isHero} />, cardType.includes('statcast'));
 
-  // AI Insight cards (custom JSX — no component wrapper)
   if (cardType === 'betting-insight' || cardType.includes('insight')) {
     const sportEmojis: Record<string, string> = {
       nba: '🏀', nfl: '🏈', mlb: '⚾', nhl: '🏒', ncaab: '🏀', ncaaf: '🏈',
@@ -378,11 +583,9 @@ export function DynamicCardRenderer({
     );
   }
 
-  // ADP upload — no overlay wrapper (it is the trigger modal itself)
   if (cardType === 'adp-upload')
     return <ADPUploadModal sport={(safeCard.data?.sport as 'mlb' | 'nfl' | undefined) ?? 'mlb'} />;
 
-  // Prop hit-rate — unique destructured prop shape
   if (cardType === 'prop-hit-rate' || cardType === 'prop_hit_rate') {
     const d = safeCard.data;
     return withOverlays(
@@ -406,17 +609,14 @@ export function DynamicCardRenderer({
     );
   }
 
-  // Player prop — different prop shape (data + category + gradient only)
   if (cardType.includes('player_prop') || cardType === 'player-prop')
     return withOverlays(<PlayerPropCard data={safeCard.data} category={safeCard.category} gradient={safeCard.gradient} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // Standalone typed cards (direct API data, exact matches)
   if (cardType === 'odds_event')      return withOverlays(<OddsCard event={safeCard.data as any} onAsk={onAsk} />);
   if (cardType === 'kalshi_market')   return withOverlays(<KalshiMarketCard market={safeCard.data as any} onAsk={onAsk} />);
   if (cardType === 'player_profile')  return withOverlays(<PlayerCard player={safeCard.data as any} onAsk={onAsk} />);
   if (cardType === 'arbitrage_opp')   return withOverlays(<ArbitrageOpportunityCard opportunity={safeCard.data as any} onAsk={onAsk} />);
 
-  // DFS Lineup — requires field normalization before render
   if (cardType === 'dfs_lineup') {
     const rawLineup = safeCard.data.lineup;
     const rosterArray: any[] = rawLineup?.roster ?? (Array.isArray(rawLineup) ? rawLineup : null) ?? safeCard.data.players ?? [];
@@ -429,12 +629,9 @@ export function DynamicCardRenderer({
     return withOverlays(<DFSLineupCard lineup={lineup} totalProjected={rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0} site={safeCard.data.site ?? 'DK'} onAsk={onAsk} />);
   }
 
-  // DFS Games: skipBookmark (interactive card with built-in controls)
   if (cardType === 'dfs-games')  return withOverlays(<DFSGamesCard data={safeCard.data as any} onAsk={onAsk} />, true);
-  // DFS Slate: full lineup roster card
   if (cardType === 'dfs-slate')  return withOverlays(<DFSSlateCard title={safeCard.title} data={safeCard.data} onAnalyze={handleAnalyze} isHero={isHero} />);
 
-  // ArbitrageCard has different props from ArbitrageOpportunityCard (legacy pipeline)
   if (cardType.includes('arbitrage'))
     return withOverlays(<ArbitrageCard data={safeCard.data as any} gradient={safeCard.gradient} onAnalyze={handleAnalyze} isHero={isHero} />);
 
@@ -444,7 +641,7 @@ export function DynamicCardRenderer({
     if (test(cardType)) return renderStd(Component);
   }
   if (process.env.NODE_ENV === 'development') {
-    console.warn(`[DynamicCardRenderer] Unknown card type "${safeCard.type}" — falling back to BettingCard. Add it to CARD_TYPES and the dispatch chain.`);
+    console.warn(`[DynamicCardRenderer] Unknown card type "${safeCard.type}" — falling back to BettingCard.`);
   }
   return renderStd(BettingCard);
 }

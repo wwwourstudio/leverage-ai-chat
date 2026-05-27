@@ -109,7 +109,7 @@ export const CardLayout = memo(function CardLayout({
   if (!cards || cards.length === 0) return <CardsEmptyState />;
 
   const heroCard = cards[0];
-  const rest = cards.slice(1, 7);
+  const rest = cards.slice(1, 13);
 
   // 1. Status filter — 'target' aliases 'optimal', 'sleeper' aliases 'value'
   const afterStatus = filter === 'all'

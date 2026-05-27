@@ -537,7 +537,7 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
 
         const conversationHistory = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content || '' }));
         const refreshSport = detectedCategory === 'kalshi' ? undefined : (extractSport(lastUserQuery, conversationHistory) || selectedSport || undefined);
-        const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, topic: detectedCategory === 'kalshi' ? selectedKalshiTopic || undefined : undefined, limit: 7 });
+        const freshCards = await fetchDynamicCards({ sport: refreshSport, userContext: lastUserQuery, category: detectedCategory, topic: detectedCategory === 'kalshi' ? selectedKalshiTopic || undefined : undefined, limit: 12 });
         if (freshCards.length === 0) {
           // Reset the guard so the next query can retry rather than being permanently blocked
           fetchedForQueryRef.current = null;

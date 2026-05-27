@@ -90,6 +90,9 @@ const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: Rea
   // Note: 'arbitrage' is NOT listed here — the pre-registry catches all arbitrage
   // types (arbitrage_opp → ArbitrageOpportunityCard, *arbitrage* → ArbitrageCard)
   // before this table is ever reached. An entry here would be dead code.
+  { test: t => t === 'moneyline-value' || t === 'totals-value',                                                                        Component: BettingCard },
+  { test: t => t === 'fantasy-insight' || t === 'bestball-stack' || t === 'auction-value',                                            Component: FantasyCard, skipBookmark: true },
+  { test: t => t.includes('dfs-value') || t.includes('dfs-matchup') || t.includes('dfs-contrarian') || t.includes('dfs-strategy'),   Component: DFSCard },
   { test: t => t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread') || t.includes('totals'), Component: BettingCard },
 ];
 
@@ -185,7 +188,15 @@ export function DynamicCardRenderer({
     (typeof safeCard.data.status === 'string' && safeCard.data.status === 'NO_DATA') ||
     (safeCard.title.toLowerCase().includes('offseason') && safeCard.realData === false);
 
-  if (isNoGamesCard) return null;
+  if (isNoGamesCard) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-4 py-3 flex items-center gap-2 opacity-60">
+        <span className="text-[10px] text-[var(--text-faint)] italic">
+          No live {safeCard.category || safeCard.title} data right now
+        </span>
+      </div>
+    );
+  }
 
   const handleAnalyze = onAnalyze ? () => onAnalyze(card) : undefined;
 

@@ -471,7 +471,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
           <div className="grid grid-cols-4 gap-1.5">
-            {isHitter ? [
+            {(isHitter ? [
               { label: 'AVG', val: seasonStats.avg ?? '--' },
               { label: 'HR',  val: String(seasonStats.hr ?? 0) },
               { label: 'RBI', val: String(seasonStats.rbi ?? 0) },

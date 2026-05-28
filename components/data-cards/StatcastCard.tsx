@@ -80,6 +80,13 @@ const TYPE_CONFIG: Record<string, TypeConf> = {
     accentBorder: 'border-teal-500/30', accentText: 'text-teal-400',
     accentBg: 'bg-teal-500/10', iconBg: 'bg-teal-500/15',
   },
+  // Virtual key — used when isHitter===true regardless of card type string
+  statcast_hitter_card: {
+    emoji: '🏏', label: 'Hitter',
+    gradient: 'from-amber-500/5 dark:from-amber-600/20 dark:via-orange-900/10 to-transparent',
+    accentBorder: 'border-amber-500/30', accentText: 'text-amber-400',
+    accentBg: 'bg-amber-500/10', iconBg: 'bg-amber-500/15',
+  },
 };
 const DEFAULT_CONF: TypeConf = TYPE_CONFIG.statcast_summary_card;
 
@@ -90,20 +97,31 @@ const STATUS_CONFIG: Record<string, { label: string; dotCls: string; textCls: st
   optimal: { label: 'OPTIMAL', dotCls: 'bg-sky-400',     textCls: 'text-sky-400',     bgCls: 'bg-sky-500/10',     borderCls: 'border-sky-500/25' },
 };
 
-// ── Pitcher Gauge constants & helpers ─────────────────────────────────────────
+// ── Gauge constants & helpers (pitcher + hitter) ──────────────────────────────
 
-const PITCHER_LEAGUE_AVG: Record<string, { avg: number; lowerBetter: boolean }> = {
-  'xwOBA Against':       { avg: 0.315, lowerBetter: true  },
-  'Exit Velo Against':   { avg: 88.5,  lowerBetter: true  },
-  'Hard Hit% Against':   { avg: 36.5,  lowerBetter: true  },
-  'Barrel% Against':     { avg: 7.5,   lowerBetter: true  },
-  'xwOBA':               { avg: 0.315, lowerBetter: false },
-  'Exit Velocity':       { avg: 88.5,  lowerBetter: false },
-  'Hard Hit%':           { avg: 36.5,  lowerBetter: false },
+const LEAGUE_AVG: Record<string, { avg: number; lowerBetter: boolean }> = {
+  // Pitcher "against" metrics
+  'xwOBA Against':     { avg: 0.315, lowerBetter: true  },
+  'Exit Velo Against': { avg: 88.5,  lowerBetter: true  },
+  'Hard Hit% Against': { avg: 36.5,  lowerBetter: true  },
+  'Barrel% Against':   { avg: 7.5,   lowerBetter: true  },
+  // Hitter offensive metrics
+  'xwOBA':             { avg: 0.315, lowerBetter: false },
+  'Exit Velocity':     { avg: 88.5,  lowerBetter: false },
+  'Hard Hit%':         { avg: 36.5,  lowerBetter: false },
+  'Barrel%':           { avg: 8.0,   lowerBetter: false },
+  'xBA':               { avg: 0.248, lowerBetter: false },
+  'xSLG':              { avg: 0.400, lowerBetter: false },
+  'Sweet Spot%':       { avg: 30.0,  lowerBetter: false },
+  'Launch Angle':      { avg: 12.0,  lowerBetter: false },
+  // Pitcher rate stats
+  'K%':                { avg: 22.0,  lowerBetter: false },
+  'BB%':               { avg: 8.0,   lowerBetter: true  },
+  'Whiff%':            { avg: 25.0,  lowerBetter: false },
 };
 
-function getPitcherPercentile(label: string, rawValue: string): number | null {
-  const entry = PITCHER_LEAGUE_AVG[label];
+function getMetricPercentile(label: string, rawValue: string): number | null {
+  const entry = LEAGUE_AVG[label];
   if (!entry) return null;
   const val = parseFloat(rawValue);
   if (!Number.isFinite(val)) return null;
@@ -120,11 +138,21 @@ function gaugeColor(pct: number): string {
   return '#f87171';
 }
 
-const PITCH_LABEL_SHORT: Record<string, string> = {
+const METRIC_LABEL_SHORT: Record<string, string> = {
+  // Pitcher against
   'xwOBA Against':     'xwOBA vs',
   'Exit Velo Against': 'EV vs',
   'Hard Hit% Against': 'HH% vs',
   'Barrel% Against':   'BBL% vs',
+  // Hitter
+  'Exit Velocity':     'Exit Velo',
+  'Hard Hit%':         'Hard Hit%',
+  'Barrel%':           'Barrel%',
+  'xwOBA':             'xwOBA',
+  'xBA':               'xBA',
+  'xSLG':              'xSLG',
+  'Sweet Spot%':       'Swt Spot%',
+  'Launch Angle':      'Avg LA',
 };
 
 // ── Watchlist hook ─────────────────────────────────────────────────────────────
@@ -250,13 +278,13 @@ function GaugeArc({ percentile, color }: { percentile: number; color: string }) 
   );
 }
 
-function PitcherGauges({ metrics }: { metrics: Metric[] }) {
+function PlayerGauges({ metrics }: { metrics: Metric[] }) {
   const top = metrics.slice(0, 3);
   if (!top.length) return null;
   return (
     <div className="flex justify-around items-start gap-1 mb-4">
       {top.map((m, i) => {
-        const pct   = getPitcherPercentile(m.label, m.value);
+        const pct   = getMetricPercentile(m.label, m.value);
         const color = pct !== null ? gaugeColor(pct) : '#6b7280';
         return (
           <div key={i} className="flex flex-col items-center gap-1 flex-1 min-w-0">
@@ -275,11 +303,11 @@ function PitcherGauges({ metrics }: { metrics: Metric[] }) {
               </div>
             </div>
             <span className="text-[9px] font-black uppercase tracking-wider text-[var(--foreground)]/40 text-center leading-tight px-0.5">
-              {PITCH_LABEL_SHORT[m.label] ?? m.label}
+              {METRIC_LABEL_SHORT[m.label] ?? m.label}
             </span>
-            {PITCHER_LEAGUE_AVG[m.label] && (
+            {LEAGUE_AVG[m.label] && (
               <span className="text-[8px] text-[var(--foreground)]/20">
-                lg avg {PITCHER_LEAGUE_AVG[m.label].avg}
+                lg avg {LEAGUE_AVG[m.label].avg}
               </span>
             )}
           </div>
@@ -331,15 +359,13 @@ function StatTile({ label, value, pct, accentText }: { label: string; value: str
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
-const PITCHER_TABS = ['Stats', 'Advanced', 'Props'] as const;
-
-function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }: {
-  active: number; onSelect: (i: number) => void;
+function PlayerTabBar({ active, onSelect, tabs, accentBg, accentBorder, accentText }: {
+  active: number; onSelect: (i: number) => void; tabs: readonly string[];
   accentBg: string; accentBorder: string; accentText: string;
 }) {
   return (
     <div className="flex gap-1 mb-4 p-0.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
-      {PITCHER_TABS.map((label, i) => (
+      {tabs.map((label, i) => (
         <button
           key={i}
           onClick={() => onSelect(i)}
@@ -359,20 +385,42 @@ function PitcherTabBar({ active, onSelect, accentBg, accentBorder, accentText }:
 
 // ── Tab 0: Stats ──────────────────────────────────────────────────────────────
 
-function TabStats({ metrics, trendNote, conf }: {
-  metrics: Metric[]; trendNote?: string; conf: TypeConf;
+function TabStats({ metrics, trendNote, conf, isHitter }: {
+  metrics: Metric[]; trendNote?: string; conf: TypeConf; isHitter?: boolean;
 }) {
+  // For hitters: top 3 arc gauges + contact quality grid for remaining metrics
+  const contactMetrics = isHitter ? metrics.slice(3) : [];
   return (
     <div>
-      <PitcherGauges metrics={metrics} />
+      <PlayerGauges metrics={metrics} />
+      {/* Hitter contact quality grid */}
+      {isHitter && contactMetrics.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Contact Quality</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {contactMetrics.map((m, i) => {
+              const pct = getMetricPercentile(m.label, m.value);
+              return (
+                <StatTile
+                  key={i}
+                  label={m.label}
+                  value={m.value}
+                  accentText={conf.accentText}
+                  pct={pct !== null ? pct : undefined}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
       {trendNote && (
         <div className={cn(
           'mt-3 px-3.5 py-3 rounded-2xl border-l-2',
           conf.accentBg, conf.accentBorder,
-          'border-l-cyan-400',
+          isHitter ? 'border-l-amber-400' : 'border-l-cyan-400',
         )}>
           <div className="flex items-start gap-2">
-            <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <Activity className={cn('w-3.5 h-3.5 shrink-0 mt-0.5', isHitter ? 'text-amber-400' : 'text-cyan-400')} />
             <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{trendNote}</p>
           </div>
         </div>
@@ -392,15 +440,33 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
   isHitter?: boolean;
 }) {
   const extraMetrics = metrics.slice(3);
-  const hasPitchMix  = data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff;
-  const hasRelease   = data.spinRate || data.extension || data.hBreak || data.vBreak;
+  const hasPitchMix  = !isHitter && (data.pitchMixFB || data.pitchMixBrk || data.pitchMixOff);
+  const hasRelease   = !isHitter && (data.spinRate || data.extension || data.hBreak || data.vBreak);
   const hasSeason    = !!seasonStats;
   const hasLog       = gameLog.length > 0;
 
+  // Position-aware season stat grid
+  const seasonGrid = isHitter
+    ? [
+        { label: 'AVG',  val: seasonStats?.avg ?? '--' },
+        { label: 'HR',   val: String(seasonStats?.hr ?? 0) },
+        { label: 'RBI',  val: String(seasonStats?.rbi ?? 0) },
+        { label: 'SB',   val: String(seasonStats?.sb ?? 0) },
+      ]
+    : [
+        { label: 'ERA',  val: seasonStats?.era ?? '--' },
+        { label: 'K',    val: String(seasonStats?.k ?? 0) },
+        { label: 'BB',   val: String(seasonStats?.bb ?? 0) },
+        { label: 'G',    val: String(seasonStats?.gamesPlayed ?? 0) },
+      ];
+
+  // Position-aware log columns
+  const logHeaders = isHitter ? ['Date', 'Opp', 'AB', 'H', 'HR', 'RBI'] : ['Date', 'Opp', 'IP', 'K', 'ER', 'BB'];
+
   return (
     <div className="space-y-4">
-      {/* Core rate stats */}
-      {extraMetrics.length > 0 && (
+      {/* Extra rate stats (non-gauge metrics) — skip for hitters since they're in Stats tab contact grid */}
+      {!isHitter && extraMetrics.length > 0 && (
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Rate Stats</p>
           <div className="rounded-xl bg-[var(--bg-overlay)] border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
@@ -413,7 +479,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
         </div>
       )}
 
-      {/* Pitch Arsenal */}
+      {/* Pitch Arsenal (pitchers only) */}
       {hasPitchMix && (
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Pitch Arsenal</p>
@@ -449,7 +515,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
         </div>
       )}
 
-      {/* Spin & Release */}
+      {/* Spin & Release (pitchers only) */}
       {hasRelease && (
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Spin & Release</p>
@@ -467,20 +533,20 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
       )}
 
       {/* Season Stats */}
-      {hasSeason && seasonStats && (
+      {hasSeason && (
         <div>
           <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Season Stats</p>
           <div className="grid grid-cols-4 gap-1.5">
             {(isHitter ? [
-              { label: 'AVG', val: seasonStats.avg ?? '--' },
-              { label: 'HR',  val: String(seasonStats.hr ?? 0) },
-              { label: 'RBI', val: String(seasonStats.rbi ?? 0) },
-              { label: 'SB',  val: String(seasonStats.sb ?? 0) },
+              { label: 'AVG', val: seasonStats?.avg ?? '--' },
+              { label: 'HR',  val: String(seasonStats?.hr ?? 0) },
+              { label: 'RBI', val: String(seasonStats?.rbi ?? 0) },
+              { label: 'SB',  val: String(seasonStats?.sb ?? 0) },
             ] : [
-              { label: 'ERA', val: seasonStats.era ?? '--' },
-              { label: 'K',   val: String(seasonStats.k ?? 0) },
-              { label: 'BB',  val: String(seasonStats.bb ?? 0) },
-              { label: 'G',   val: String(seasonStats.gamesPlayed) },
+              { label: 'ERA', val: seasonStats?.era ?? '--' },
+              { label: 'K',   val: String(seasonStats?.k ?? 0) },
+              { label: 'BB',  val: String(seasonStats?.bb ?? 0) },
+              { label: 'G',   val: String(seasonStats?.gamesPlayed ?? 0) },
             ]).map((s, i) => (
               <StatTile key={i} label={s.label} value={s.val} accentText={conf.accentText} />
             ))}
@@ -497,7 +563,7 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
             <span className="text-[8px] text-[var(--foreground)]/25 uppercase tracking-widest">Form</span>
             {gameLog.slice(0, 5).map((g, i) => {
               const isGood = isHitter ? (g.h ?? 0) >= 2 || (g.hr ?? 0) >= 1 : (parseFloat(g.ip ?? '0') >= 6 && (g.er ?? 0) <= 3);
-              const isBad  = isHitter ? (g.h ?? 0) === 0 && (g.ab ?? 0) >= 3    : (g.er ?? 0) >= 4;
+              const isBad  = isHitter ? (g.h ?? 0) === 0 && (g.ab ?? 0) >= 3 : (g.er ?? 0) >= 4;
               const label  = isHitter
                 ? ((g.hr ?? 0) >= 1 ? 'HR' : (g.h ?? 0) >= 2 ? 'H' : '·')
                 : (isGood ? 'Q' : isBad ? '✗' : '·');
@@ -539,13 +605,18 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
                 )}
                 style={{ gridTemplateColumns: isHitter ? '1fr 40px 28px 28px 28px 28px' : '1fr 40px 32px 28px 28px 28px' }}
               >
-                <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">{g.date}</span>
+                <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">
+                  {g.date}
+                  {!isHitter && parseFloat(g.ip ?? '0') >= 6 && (g.er ?? 0) <= 3 && (
+                    <span className="ml-1 text-[7px] font-black text-blue-400">QS</span>
+                  )}
+                </span>
                 <span className="text-[10px] text-[var(--text-muted)] font-bold text-right truncate">{g.opp}</span>
                 {isHitter ? (
                   <>
                     <span className="text-[10px] text-[var(--foreground)]/70 font-bold text-right">{g.ab ?? '—'}</span>
-                    <span className={cn('text-[10px] font-black text-right', (g.h ?? 0) >= 2 ? 'text-blue-400' : 'text-[var(--text-faint)]')}>{g.h ?? '—'}</span>
-                    <span className={cn('text-[10px] font-black text-right', (g.hr ?? 0) > 0 ? 'text-amber-400' : 'text-[var(--text-faint)]')}>{g.hr ?? '—'}</span>
+                    <span className={cn('text-[10px] font-black text-right', (g.h ?? 0) >= 2 ? 'text-amber-400' : (g.h ?? 0) >= 1 ? 'text-foreground' : 'text-rose-400')}>{g.h ?? '—'}</span>
+                    <span className={cn('text-[10px] font-black text-right', (g.hr ?? 0) > 0 ? 'text-cyan-400' : 'text-[var(--text-faint)]')}>{g.hr ?? '—'}</span>
                     <span className="text-[10px] text-[var(--text-faint)] text-right">{g.rbi ?? '—'}</span>
                   </>
                 ) : (
@@ -567,11 +638,13 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
 
 // ── Tab 2: Props ──────────────────────────────────────────────────────────────
 
-function TabProps({ data, propLines, onAnalyze, isHitter }: {
+function TabProps({ data, propLines, onAnalyze, isHitter, playerName, accentText }: {
   data: Record<string, any>;
   propLines: PropLine[];
   onAnalyze?: () => void;
   isHitter?: boolean;
+  playerName?: string;
+  accentText?: string;
 }) {
   const fmtOdds = (o: number) => (o > 0 ? `+${o}` : String(o));
   const barWidth = (pct: number) => Math.min(100, Math.max(4, pct));
@@ -637,7 +710,75 @@ function TabProps({ data, propLines, onAnalyze, isHitter }: {
     );
   }
 
-  // No prop lines — show K projection from raw data
+  // No prop lines — show position-appropriate projection tiles
+  if (isHitter) {
+    // Hitter fallback: xBA-based hit projection + barrel vs league
+    const xbaRaw    = parseFloat(String(data?.xba ?? data?.expectedBattingAverage ?? '').replace(/[^0-9.]/g, '')) || null;
+    const barrelRaw = parseFloat(String(data?.barrelRate ?? data?.barrelPct ?? '').replace(/[^0-9.]/g, '')) || null;
+    const projHitsPerGame = xbaRaw ? (xbaRaw * 3.5).toFixed(2) : null;
+    const barrelVsAvg = barrelRaw != null
+      ? `${barrelRaw > 8 ? '+' : ''}${(barrelRaw - 8.0).toFixed(1)}% vs avg`
+      : null;
+
+    return (
+      <div className="space-y-3">
+        {(projHitsPerGame != null || barrelVsAvg != null) && (
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-faint)] mb-2">Statcast Projections</p>
+            <div className="grid grid-cols-2 gap-2">
+              {projHitsPerGame && (
+                <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-3 text-center">
+                  <p className="text-xl font-black text-amber-300 tabular-nums">{projHitsPerGame}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-amber-400/70 mt-1">Proj H/Game</p>
+                </div>
+              )}
+              {barrelVsAvg && (
+                <div className={cn(
+                  'rounded-2xl border p-3 text-center',
+                  barrelRaw != null && barrelRaw > 8
+                    ? 'bg-cyan-500/8 border-cyan-500/20'
+                    : 'bg-rose-500/8 border-rose-500/20',
+                )}>
+                  <p className={cn(
+                    'text-xl font-black tabular-nums',
+                    barrelRaw != null && barrelRaw > 8 ? 'text-cyan-300' : 'text-rose-300',
+                  )}>
+                    {barrelVsAvg}
+                  </p>
+                  <p className={cn(
+                    'text-[9px] font-black uppercase tracking-wider mt-1',
+                    barrelRaw != null && barrelRaw > 8 ? 'text-cyan-400/70' : 'text-rose-400/70',
+                  )}>
+                    Barrel vs Avg
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <div className="w-10 h-10 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
+            <Zap className="w-5 h-5 text-[var(--text-faint)]" />
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">
+            Based on {playerName ?? 'player'}'s {new Date().getFullYear()} Statcast data
+          </p>
+          <p className="text-[10px] text-[var(--text-faint)]/60">Live lines post when game is scheduled</p>
+          {onAnalyze && (
+            <button
+              onClick={onAnalyze}
+              className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] font-black hover:bg-amber-500/20 transition-colors"
+            >
+              <Zap className="w-3 h-3" />
+              Ask AI for Hit Prop Analysis
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Pitcher fallback: K projection from raw data
   const kPctRaw   = data.kPctRaw   as number | undefined;
   const fbVeloRaw = data.fbVeloRaw as number | undefined;
 
@@ -692,7 +833,6 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
   const [activeTab, setActiveTab] = useState(0);
 
   const cardType   = (data.type ?? '').toLowerCase();
-  const conf       = TYPE_CONFIG[cardType] ?? DEFAULT_CONF;
   const statusKey  = (data.status ?? 'value').toLowerCase();
   const statusConf = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.value;
 
@@ -708,9 +848,25 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
   const { watched, toggle: toggleWatch } = useWatchlist(playerName);
 
-  // statcast_summary_card is used for both pitchers and hitters; detect via subcategory
+  // Detect position — pitchers have type statcast_summary_card or explicit position flag
   const isPitcherCard = cardType === 'statcast_summary_card';
-  const isHitter = isPitcherCard && (data.subcategory ?? '').toLowerCase().includes('hitter');
+  const isHitter = !isPitcherCard || (
+    data.data?.position != null
+      ? !['SP', 'RP', 'P'].includes(String(data.data.position).toUpperCase())
+      : false
+  );
+
+  // Select accent theme based on player position
+  const conf = isHitter
+    ? (TYPE_CONFIG.statcast_hitter_card ?? DEFAULT_CONF)
+    : (TYPE_CONFIG[cardType] ?? DEFAULT_CONF);
+
+  // Position-aware tab labels
+  const TABS = isPitcherCard || isHitter
+    ? (['Stats', 'Advanced', 'Props'] as const)
+    : (['Stats', 'Advanced', 'Props'] as const);
+
+  const showTabs = isPitcherCard || isHitter;
 
   return (
     <>
@@ -761,7 +917,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
                 className={cn(
                   'font-black text-foreground leading-tight truncate',
                   isHero ? 'text-base' : 'text-sm',
-                  onAnalyze && 'cursor-pointer hover:text-cyan-300 transition-colors',
+                  onAnalyze && cn('cursor-pointer transition-colors', isHitter ? 'hover:text-amber-300' : 'hover:text-cyan-300'),
                 )}
                 onClick={onAnalyze}
               >
@@ -771,15 +927,15 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Watchlist bookmark */}
-            {isPitcherCard && !isHitter && (
+            {/* Watchlist bookmark — available for both hitters and pitchers */}
+            {(isPitcherCard || isHitter) && (
               <button
                 onClick={toggleWatch}
                 title={watched ? 'Remove bookmark' : 'Bookmark player'}
                 className={cn(
                   'w-7 h-7 flex items-center justify-center rounded-xl transition-all duration-150 border',
                   watched
-                    ? 'text-cyan-400 bg-cyan-500/15 border-cyan-500/25 shadow-sm'
+                    ? cn(conf.accentText, conf.iconBg, conf.accentBorder, 'shadow-sm')
                     : 'text-[var(--text-faint)] bg-[var(--bg-elevated)] border-[var(--border-subtle)] hover:text-cyan-400 hover:bg-cyan-500/10',
                 )}
               >
@@ -798,11 +954,12 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
           </div>
         </div>
 
-        {/* Tab bar (pitcher cards only) */}
-        {isPitcherCard && (
-          <PitcherTabBar
+        {/* Tab bar — show for pitcher and hitter Statcast cards */}
+        {showTabs && (
+          <PlayerTabBar
             active={activeTab}
             onSelect={setActiveTab}
+            tabs={TABS}
             accentBg={conf.accentBg}
             accentBorder={conf.accentBorder}
             accentText={conf.accentText}
@@ -810,23 +967,41 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
         )}
 
         {/* Content */}
-        {isPitcherCard ? (
+        {showTabs ? (
           <>
             {activeTab === 0 && hasSummaryMetrics && (
-              <TabStats metrics={data.summary_metrics} trendNote={data.trend_note} conf={conf} />
+              <TabStats
+                metrics={data.summary_metrics}
+                trendNote={data.trend_note}
+                conf={conf}
+                isHitter={isHitter}
+              />
             )}
             {activeTab === 1 && (
-              <TabAdvanced metrics={data.summary_metrics ?? []} data={data.data ?? {}} seasonStats={seasonStats} gameLog={gameLog} conf={conf} isHitter={isHitter} />
+              <TabAdvanced
+                metrics={data.summary_metrics ?? []}
+                data={data.data ?? {}}
+                seasonStats={seasonStats}
+                gameLog={gameLog}
+                conf={conf}
+                isHitter={isHitter}
+              />
             )}
             {activeTab === 2 && (
-              <TabProps data={data.data ?? {}} propLines={propLines} onAnalyze={onAnalyze} isHitter={isHitter} />
+              <TabProps
+                data={data.data ?? {}}
+                propLines={propLines}
+                onAnalyze={onAnalyze}
+                isHitter={isHitter}
+                playerName={playerName}
+                accentText={conf.accentText}
+              />
             )}
           </>
         ) : (
-          /* Non-pitcher statcast cards: flat layout with enhanced tiles */
+          /* Other statcast card types: flat layout with enhanced tiles */
           <>
             {hasSummaryMetrics && <HeroMetrics metrics={data.summary_metrics} conf={conf} />}
-            {/* Remaining metrics as tiled grid */}
             {hasSummaryMetrics && data.summary_metrics.slice(3).length > 0 && (
               <div className="grid grid-cols-2 gap-1.5 mb-3">
                 {data.summary_metrics.slice(3).map((m: Metric, i: number) => (
@@ -850,10 +1025,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
               </div>
             )}
             {data.trend_note && (
-              <div className={cn(
-                'mt-3 px-3.5 py-3 rounded-2xl border-l-2',
-                conf.accentBg, conf.accentBorder,
-              )}>
+              <div className={cn('mt-3 px-3.5 py-3 rounded-2xl border-l-2', conf.accentBg, conf.accentBorder)}>
                 <div className="flex items-start gap-2">
                   <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
                   <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{data.trend_note}</p>

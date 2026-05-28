@@ -655,14 +655,17 @@ async function buildPlayerCards(playerName?: string, sport?: string): Promise<In
     const xwoba    = p.xwoba          ?? p.expected_woba;
     const sweetSpot = p.sweetSpotPct  ?? p.sweet_spot_percent ?? p.sweet_spot_pct;
 
+    const launchAngle = p.launchAngle ?? p.launch_angle_avg ?? p.avg_launch_angle;
+
     const metrics = [
       ev != null ? { label: 'Exit Velocity', value: `${Number(ev).toFixed(1)} mph` } : null,
-      barrel != null ? { label: 'Barrel %', value: `${Number(barrel).toFixed(1)}%` } : null,
+      barrel != null ? { label: 'Barrel%', value: `${Number(barrel).toFixed(1)}%` } : null,
       xwoba != null ? { label: 'xwOBA', value: String(xwoba) } : null,
-      hardHit != null ? { label: 'Hard Hit %', value: `${Number(hardHit).toFixed(1)}%` } : null,
+      hardHit != null ? { label: 'Hard Hit%', value: `${Number(hardHit).toFixed(1)}%` } : null,
       xba != null ? { label: 'xBA', value: String(xba) } : null,
       xslg != null ? { label: 'xSLG', value: String(xslg) } : null,
-      sweetSpot != null ? { label: 'Sweet Spot %', value: `${Number(sweetSpot).toFixed(1)}%` } : null,
+      sweetSpot != null ? { label: 'Sweet Spot%', value: `${Number(sweetSpot).toFixed(1)}%` } : null,
+      launchAngle != null ? { label: 'Launch Angle', value: `${Number(launchAngle).toFixed(1)}°` } : null,
     ].filter(Boolean) as Array<{ label: string; value: string }>;
 
     // Determine status from quality of metrics

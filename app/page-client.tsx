@@ -821,7 +821,10 @@ export default function UnifiedAIPlatform({ serverData }: UnifiedAIPlatformProps
     });
 
   const hardcodedQuickActions = getHardcodedQuickActions(selectedCategory, selectedSport, selectedKalshiTopic);
-  const quickActions = aiQuickActions ?? hardcodedQuickActions;
+  // Always use platform+sport-specific hardcoded prompts for the pill row so they
+  // stay in sync with the selected category/sport. AI-generated prompts from
+  // /api/prompts are shown only as contextual follow-ups after a conversation starts.
+  const quickActions = hardcodedQuickActions;
 
   const activeChatObj = chats.find((c: Chat) => c.id === activeChat) ?? null;
 

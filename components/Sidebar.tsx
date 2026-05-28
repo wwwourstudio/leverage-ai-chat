@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Plus, Search, Star, Trash2, MessageSquare, Edit3, CheckCircle,
   LayoutGrid, TrendingUp, Trophy, Award, BarChart3,
-  Zap, ChevronLeft, ChevronRight, X, Hash,
+  ChevronRight, X, Hash,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/utils';
@@ -728,30 +728,8 @@ export function Sidebar({
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--border-subtle)]">
-          {/* Branding row */}
-          <div className="flex items-center justify-between px-3 pt-3 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <Zap className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="text-[13px] font-black tracking-tight text-foreground">
-                Leverage <span className="text-blue-400">AI</span>
-              </span>
-            </div>
-
-            {/* Collapse button */}
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-foreground hover:bg-[var(--bg-surface)] transition-all duration-150 group"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-
           {/* New Analysis CTA */}
-          <div className="px-3 pb-3">
+          <div className="px-3 pt-3 pb-3">
             <button
               onClick={onNewChat}
               className="w-full relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white px-4 py-2.5 font-bold text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 group"

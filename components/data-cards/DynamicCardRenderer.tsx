@@ -637,11 +637,20 @@ export function DynamicCardRenderer({
       player_type: p.player_type ?? p.primaryPosition ?? p.position ?? '',
       dk_pts_mean: p.dk_pts_mean ?? p.projectedPoints ?? 0,
     }));
-    return withOverlays(<DFSLineupCard lineup={lineup} totalProjected={rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0} site={safeCard.data.site ?? 'DK'} onAsk={onAsk} />);
+    // DFSLineupCard has its own complete shell with header/badges — render without
+    // withOverlays so the generic "ESTIMATED" badge never collides with the card's UI.
+    return (
+      <DFSLineupCard
+        lineup={lineup}
+        totalProjected={rawLineup?.totalProjected ?? safeCard.data.totalProjected ?? 0}
+        site={safeCard.data.site ?? 'DK'}
+        onAsk={onAsk}
+      />
+    );
   }
 
-  if (cardType === 'dfs-games')  return withOverlays(<DFSGamesCard data={safeCard.data as any} onAsk={onAsk} />, true);
-  if (cardType === 'dfs-slate')  return withOverlays(<DFSSlateCard title={safeCard.title} data={safeCard.data} onAnalyze={handleAnalyze} isHero={isHero} />);
+  if (cardType === 'dfs-games')  return <DFSGamesCard data={safeCard.data as any} onAsk={onAsk} />;
+  if (cardType === 'dfs-slate')  return <DFSSlateCard title={safeCard.title} data={safeCard.data} onAnalyze={handleAnalyze} isHero={isHero} />;
 
   if (cardType.includes('arbitrage'))
     return withOverlays(<ArbitrageCard data={safeCard.data as any} gradient={safeCard.gradient} onAnalyze={handleAnalyze} isHero={isHero} />);

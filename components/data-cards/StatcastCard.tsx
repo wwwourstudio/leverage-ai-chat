@@ -638,13 +638,14 @@ function TabAdvanced({ metrics, data, seasonStats, gameLog, conf, isHitter }: {
 
 // ── Tab 2: Props ──────────────────────────────────────────────────────────────
 
-function TabProps({ data, propLines, onAnalyze, isHitter, playerName, accentText }: {
+function TabProps({ data, propLines, onAnalyze, isHitter, playerName, accentText, allMetrics }: {
   data: Record<string, any>;
   propLines: PropLine[];
   onAnalyze?: () => void;
   isHitter?: boolean;
   playerName?: string;
   accentText?: string;
+  allMetrics?: Metric[];
 }) {
   const fmtOdds = (o: number) => (o > 0 ? `+${o}` : String(o));
   const barWidth = (pct: number) => Math.min(100, Math.max(4, pct));
@@ -712,9 +713,20 @@ function TabProps({ data, propLines, onAnalyze, isHitter, playerName, accentText
 
   // No prop lines — show position-appropriate projection tiles
   if (isHitter) {
+    // Helper: search data.data fields then summary_metrics (metrics live in summary_metrics for Statcast cards)
+    const getMetricRaw = (...keys: string[]): number | null => {
+      for (const key of keys) {
+        const direct = (data as Record<string, any>)[key];
+        if (direct != null) { const n = parseFloat(String(direct).replace(/[^0-9.]/g, '')); if (!isNaN(n)) return n; }
+      }
+      const metric = allMetrics?.find(m => keys.some(k => m.label.toLowerCase() === k.toLowerCase()));
+      if (metric) { const n = parseFloat(String(metric.value).replace(/[^0-9.]/g, '')); if (!isNaN(n)) return n; }
+      return null;
+    };
+
     // Hitter fallback: xBA-based hit projection + barrel vs league
-    const xbaRaw    = parseFloat(String(data?.xba ?? data?.expectedBattingAverage ?? '').replace(/[^0-9.]/g, '')) || null;
-    const barrelRaw = parseFloat(String(data?.barrelRate ?? data?.barrelPct ?? '').replace(/[^0-9.]/g, '')) || null;
+    const xbaRaw    = getMetricRaw('xba', 'xBA', 'expectedBattingAverage');
+    const barrelRaw = getMetricRaw('barrelRate', 'barrelPct', 'Barrel%', 'barrel%');
     const projHitsPerGame = xbaRaw ? (xbaRaw * 3.5).toFixed(2) : null;
     const barrelVsAvg = barrelRaw != null
       ? `${barrelRaw > 8 ? '+' : ''}${(barrelRaw - 8.0).toFixed(1)}% vs avg`
@@ -848,12 +860,15 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
 
   const { watched, toggle: toggleWatch } = useWatchlist(playerName);
 
-  // Detect position — pitchers have type statcast_summary_card or explicit position flag
+  // Detect position — pitchers have type statcast_summary_card or explicit position flag.
+  // Fall back to subcategory string when position field is absent (common for AI-generated cards).
   const isPitcherCard = cardType === 'statcast_summary_card';
+  const positionStr = String(data.data?.position ?? '').toUpperCase().trim();
+  const subcatStr   = (data.subcategory ?? '').toLowerCase();
   const isHitter = !isPitcherCard || (
-    data.data?.position != null
-      ? !['SP', 'RP', 'P'].includes(String(data.data.position).toUpperCase())
-      : false
+    positionStr
+      ? !['SP', 'RP', 'P'].includes(positionStr)
+      : subcatStr.includes('hitter') || subcatStr.includes('batter') || subcatStr.includes('batting')
   );
 
   // Select accent theme based on player position
@@ -995,6 +1010,7 @@ export const StatcastCard = memo(function StatcastCard({ data, onAnalyze, isHero
                 isHitter={isHitter}
                 playerName={playerName}
                 accentText={conf.accentText}
+                allMetrics={data.summary_metrics}
               />
             )}
           </>

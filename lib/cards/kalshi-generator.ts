@@ -71,6 +71,149 @@ function extractOutcomeLabels(m: any): [string, string] {
   return ['Yes', 'No'];
 }
 
+/**
+ * For multi-outcome event tiles: extract the team/candidate name that represents
+ * the YES side of a binary market — e.g. "Will the Lakers win?" → "Lakers".
+ */
+function extractCandidateLabel(m: any): string {
+  const title: string = (m.title || '').trim();
+
+  // "Will [X] win/beat/take/clinch/be ...?" → X
+  const willMatch = title.match(/^Will\s+(?:the\s+)?(.+?)\s+(?:win|beat|take|clinch|be|become|get|make|reach|cover|score|finish|lead|advance|qualify)/i);
+  if (willMatch) {
+    const raw = willMatch[1].trim().replace(/\?$/, '');
+    if (raw.length > 0 && raw.length < 40) return raw;
+  }
+
+  // "subtitle: Yes: [X]" (most explicit)
+  const sub: string = m.subtitle || '';
+  if (sub.startsWith('Yes: ') && sub.length > 5) {
+    const label = sub.slice(5).trim();
+    if (label.length > 0 && label.length < 40) return label;
+  }
+
+  // "[X] to win/beat/cover ...?" → X
+  const toWin = title.match(/^(?:the\s+)?(.+?)\s+(?:to win|to beat|to cover|to advance|to make|to reach|to qualify)/i);
+  if (toWin) {
+    const raw = toWin[1].trim().replace(/\?$/, '');
+    if (raw.length > 0 && raw.length < 40) return raw;
+  }
+
+  // "[X] wins/wins ...?" → X
+  const winsMatch = title.match(/^(?:the\s+)?(.+?)\s+wins?\b/i);
+  if (winsMatch) {
+    const raw = winsMatch[1].trim().replace(/\?$/, '');
+    if (raw.length > 0 && raw.length < 40) return raw;
+  }
+
+  // Fallback: first meaningful segment before " -" or "·" separator
+  const segment = title.split(/\s+[-·]\s+/)[0].trim().replace(/\?$/, '');
+  if (segment.length > 0 && segment.length < 40) return segment;
+
+  return title.slice(0, 25).replace(/\?$/, '').trim() || 'Yes';
+}
+
+/**
+ * Extract a shared event title from a group of related binary markets.
+ * e.g. "Will Lakers win NBA Finals?" + "Will Celtics win NBA Finals?"
+ *      → "NBA Finals Winner"
+ */
+function extractEventTitle(markets: any[]): string {
+  // Find the longest common suffix across all titles (the repeated part = the event name)
+  const titles: string[] = markets.map(m => (m.title || '').trim());
+  if (titles.length === 0) return 'Prediction Market';
+  if (titles.length === 1) return titles[0];
+
+  // Common tail: split on spaces, find shared ending words
+  const words0 = titles[0].split(/\s+/);
+  let commonTailLen = 0;
+  for (let i = 1; i <= words0.length; i++) {
+    const tail = words0.slice(-i).join(' ');
+    if (titles.every(t => t.toLowerCase().includes(tail.toLowerCase()))) {
+      commonTailLen = i;
+    } else {
+      break;
+    }
+  }
+
+  if (commonTailLen >= 2) {
+    return words0.slice(-commonTailLen).join(' ').replace(/^\W+/, '').trim();
+  }
+
+  // Fall back to the first market's title
+  return titles[0];
+}
+
+/**
+ * Group markets by eventTicker and build KalshiTileData entries.
+ * Events with 2+ related binary markets get multi-outcome tiles;
+ * singleton/unique markets get binary YES/NO tiles.
+ */
+function buildEventTiles(markets: any[], sub: string): KalshiTileData[] {
+  // Group by eventTicker (fall back to ticker if eventTicker missing)
+  const eventMap = new Map<string, any[]>();
+  for (const m of markets) {
+    const key = m.eventTicker && m.eventTicker !== m.ticker ? m.eventTicker : `__single__${m.ticker}`;
+    if (!eventMap.has(key)) eventMap.set(key, []);
+    eventMap.get(key)!.push(m);
+  }
+
+  const tiles: KalshiTileData[] = [];
+  const seen = new Set<string>();
+
+  for (const m of markets) {
+    const eventKey = m.eventTicker && m.eventTicker !== m.ticker ? m.eventTicker : `__single__${m.ticker}`;
+    if (seen.has(eventKey)) continue;
+    seen.add(eventKey);
+
+    const group = eventMap.get(eventKey)!;
+
+    // Multi-outcome event: 2+ related markets with real prices
+    const realPriced = group.filter((em: any) => em.priceIsReal || em.yesPrice !== 50);
+    if (realPriced.length >= 2) {
+      // Sort by yesPrice descending (leading candidate first)
+      const sorted = realPriced
+        .sort((a: any, b: any) => (b.yesPrice ?? 50) - (a.yesPrice ?? 50))
+        .slice(0, 4);
+
+      const outcomes: KalshiTileData['outcomes'] = sorted.map((em: any, i: number) => {
+        const pct = Math.min(99, Math.max(1, Math.round(em.yesPrice ?? 50)));
+        return {
+          label: extractCandidateLabel(em),
+          yesPct: pct,
+          multiplier: pct > 0 ? parseFloat((100 / pct).toFixed(2)) : 2,
+          isLeading: i === 0,
+          avatarUrl: em.avatarUrl,
+        };
+      });
+
+      const iconMeta = deriveIconMeta(m, sub);
+      const totalVol = group.reduce((s: number, em: any) => s + (em.volume24h > 0 ? em.volume24h : em.volume ?? 0), 0);
+
+      tiles.push({
+        ticker: sorted[0].ticker ?? m.ticker,
+        title: extractEventTitle(group),
+        categoryChip: deriveChip(m),
+        outcomes,
+        volume: fmtVolFull(totalVol),
+        marketCount: group.length,
+        isLive: group.some((em: any) => em.status === 'active'),
+        eventTicker: m.eventTicker,
+        seriesTicker: m.seriesTicker,
+        closeTimeIso: m.closeTime || null,
+        ...iconMeta,
+      });
+    } else {
+      // Single binary market
+      tiles.push(normalizeMarketForTile(m, sub));
+    }
+
+    if (tiles.length >= 6) break;
+  }
+
+  return tiles;
+}
+
 /** Infer icon metadata from the market category/subcategory. */
 function deriveIconMeta(m: any, sub: string): {
   iconCode?: string;
@@ -194,8 +337,8 @@ export function kalshiMarketsToGroupedCard(
   subcategory: string,
   parentTitle?: string,
 ): InsightCard {
-  const top = markets.slice(0, 6);
   const label = cap(subcategory || 'trending');
+  const tiles = buildEventTiles(markets.slice(0, 30), subcategory);
   return {
     type: `kalshi-${subcategory || 'trending'}`,
     title: parentTitle || `${label} Prediction Markets`,
@@ -204,8 +347,8 @@ export function kalshiMarketsToGroupedCard(
     subcategory: label,
     gradient: SUBCATEGORY_GRADIENTS[subcategory] ?? 'from-teal-600 to-cyan-700',
     data: {
-      markets: top.map(m => normalizeMarketForTile(m, subcategory)),
-      seriesTicker: top[0]?.seriesTicker ?? '',
+      markets: tiles,
+      seriesTicker: markets[0]?.seriesTicker ?? '',
     },
     status: 'active',
     realData: true,

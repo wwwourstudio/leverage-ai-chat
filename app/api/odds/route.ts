@@ -119,12 +119,24 @@ async function fetchOddsForSport(sport: string, marketType = 'h2h') {
       message: 'Set ODDS_API_KEY in environment variables to enable live odds.',
     };
   }
-  const events = await fetchLiveOdds(validation.normalizedKey, {
-    apiKey,
-    markets: MARKETS_MAP[marketType] ?? [ODDS_MARKETS.H2H],
-    regions: [BETTING_REGIONS.US],
-    oddsFormat: 'american',
-  });
+  let events: any;
+  try {
+    events = await fetchLiveOdds(validation.normalizedKey, {
+      apiKey,
+      markets: MARKETS_MAP[marketType] ?? [ODDS_MARKETS.H2H],
+      regions: [BETTING_REGIONS.US],
+      oddsFormat: 'american',
+    });
+  } catch (fetchErr) {
+    const msg = fetchErr instanceof Error ? fetchErr.message : 'Failed to fetch odds';
+    console.error('[API/odds] fetchLiveOdds error:', msg);
+    return {
+      success: false as const,
+      error: msg,
+      events: [],
+      timestamp: new Date().toISOString(),
+    };
+  }
   const rawEvents = Array.isArray(events) ? events : [];
   return {
     success: true as const,
@@ -145,13 +157,17 @@ export async function GET(request: NextRequest) {
     const sport      = searchParams.get('sport')   ?? getDefaultSport();
     const marketType = searchParams.get('markets') ?? 'all';
     const result = await fetchOddsForSport(sport, marketType);
-    const status = result.success ? HTTP_STATUS.OK : (result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED ? HTTP_STATUS.SERVICE_UNAVAILABLE : HTTP_STATUS.BAD_REQUEST);
+    const status = result.success
+      ? HTTP_STATUS.OK
+      : result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED
+        ? HTTP_STATUS.SERVICE_UNAVAILABLE
+        : HTTP_STATUS.BAD_REQUEST;
     return NextResponse.json(result, { status });
   } catch (error) {
     console.error('[API/odds GET] Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR, events: [], timestamp: new Date().toISOString() },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
+      { status: HTTP_STATUS.BAD_REQUEST },
     );
   }
 }
@@ -173,7 +189,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await fetchOddsForSport(sport, marketType);
-    const status = result.success ? HTTP_STATUS.OK : (result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED ? HTTP_STATUS.SERVICE_UNAVAILABLE : HTTP_STATUS.BAD_REQUEST);
+    const status = result.success
+      ? HTTP_STATUS.OK
+      : result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED
+        ? HTTP_STATUS.SERVICE_UNAVAILABLE
+        : HTTP_STATUS.BAD_REQUEST;
     return NextResponse.json(result, { status });
   } catch (error) {
     console.error('[API/odds] Error:', error);
@@ -184,7 +204,7 @@ export async function POST(request: NextRequest) {
         events: [],
         timestamp: new Date().toISOString(),
       },
-      { status: HTTP_STATUS.INTERNAL_ERROR }
+      { status: HTTP_STATUS.BAD_REQUEST },
     );
   }
 }

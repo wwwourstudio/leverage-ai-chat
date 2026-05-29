@@ -420,8 +420,10 @@ export function WeatherCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow,0_0_40px_rgb(0_0_0/0.3))] transition-all duration-300',
-      isHero && 'sm:rounded-3xl border-[var(--border-hover)]',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border shadow-xl shadow-black/20 transition-all duration-300',
+      isHero
+        ? 'sm:rounded-3xl border-[var(--border-hover)]'
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.1_0.02_260/0.35)]',
     )}>
 
       {/* Condition-tinted gradient header */}

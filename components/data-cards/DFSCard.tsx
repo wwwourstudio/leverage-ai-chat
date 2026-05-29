@@ -237,10 +237,10 @@ export const DFSCard = memo(function DFSCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border shadow-xl shadow-black/20 transition-all duration-300',
       isHero
         ? 'border-[var(--border-hover)] shadow-[0_0_32px_oklch(0.72_0.20_80/0.15)]'
-        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_24px_oklch(0.72_0.20_80/0.12)]',
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.72_0.20_80/0.18)]',
     )}>
 
       {/* ══ HEADER ═══════════════════════════════════════════════════════════ */}

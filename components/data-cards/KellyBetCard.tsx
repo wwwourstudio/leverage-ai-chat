@@ -99,8 +99,10 @@ export function KellyBetCard({
   return (
     <article
       className={cn(
-        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)] transition-all duration-300 animate-fade-in-up',
-        isHero && 'sm:rounded-3xl',
+        'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border shadow-xl shadow-black/20 transition-all duration-300 animate-fade-in-up',
+        isHero
+          ? 'sm:rounded-3xl border-[var(--border-subtle)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.1_0.02_260/0.35)]',
       )}
     >
       {/* Header gradient */}

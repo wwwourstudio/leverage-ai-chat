@@ -159,10 +159,16 @@ export const KalshiMarketTile = memo(function KalshiMarketTile({ market, onClick
       {/* ── Live / Date label ── */}
       {(isLive || dateLabel) && (
         <div className="flex items-center gap-1.5 mb-2.5">
-          {isLive && (
+          {isLive && liveStatus && (
             <span className="flex items-center gap-1 text-[10px] font-bold text-red-400">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               LIVE
+            </span>
+          )}
+          {isLive && !liveStatus && (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              OPEN
             </span>
           )}
           {liveStatus && (
@@ -230,7 +236,11 @@ export const KalshiMarketTile = memo(function KalshiMarketTile({ market, onClick
 
       {/* ── Footer ── */}
       <div className="mt-3 pt-2.5 border-t border-[#2a2d3e] flex items-center justify-between">
-        <span className="text-[11px] text-gray-500 tabular-nums font-medium">{volume} vol</span>
+        {volume && volume !== '—' ? (
+          <span className="text-[11px] text-gray-500 tabular-nums font-medium">{volume} vol</span>
+        ) : (
+          <span className="text-[11px] text-gray-600 italic">Low activity</span>
+        )}
         <span className="text-[11px] text-gray-500">
           {marketCount > 1 ? `${marketCount} markets` : '1 market'}
         </span>

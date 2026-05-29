@@ -174,12 +174,12 @@ export function ArbitrageCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border transition-all duration-300 animate-fade-in-up',
+      'group relative w-full rounded-2xl overflow-hidden bg-[var(--bg-surface)] border shadow-xl shadow-black/20 transition-all duration-300 animate-fade-in-up',
       isExpired
         ? 'border-[var(--border-subtle)] opacity-50 grayscale'
         : isWarning
-          ? 'border-amber-600/40 hover:border-amber-500/60 hover:shadow-[0_0_24px_oklch(0.6_0.15_80/0.12)]'
-          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-glow)]',
+          ? 'border-amber-600/40 hover:border-amber-500/60 hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.6_0.15_80/0.18)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.1_0.02_260/0.35)]',
     )}>
       {/* Gradient header */}
       <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-blue-500/5 to-transparent dark:from-blue-600/25 dark:via-cyan-800/10 pointer-events-none" />

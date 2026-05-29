@@ -138,10 +138,10 @@ export const BettingCard = memo(function BettingCard({
 
   return (
     <article className={cn(
-      'group relative w-full rounded-2xl overflow-hidden bg-background border transition-all duration-300',
+      'group relative w-full rounded-2xl overflow-hidden bg-background border shadow-xl shadow-black/20 transition-all duration-300',
       isHero
         ? 'border-[var(--border-subtle)] shadow-[0_0_32px_oklch(0.3_0.06_260/0.12)]'
-        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:shadow-[0_0_20px_oklch(0.3_0.04_280/0.08)]',
+        : 'border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:scale-[1.01] hover:shadow-[0_8px_32px_oklch(0.1_0.02_260/0.35)]',
     )}>
 
       {/* Full-bleed gradient header */}

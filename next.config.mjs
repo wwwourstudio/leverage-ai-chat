@@ -15,6 +15,9 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: 'a.espncdn.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'img.mlbstatic.com' },
+      { protocol: 'https', hostname: 'securea.mlb.com' },
+      { protocol: 'https', hostname: 'content.mlb.com' },
     ],
   },
   allowedDevOrigins: ['vusercontent.net', '*.vusercontent.net'],

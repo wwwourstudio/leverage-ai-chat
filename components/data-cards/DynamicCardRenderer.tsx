@@ -81,8 +81,8 @@ const EXACT_STD_REGISTRY: Record<string, React.ComponentType<any>> = {
   closing_line_card:    ClosingLineCard,
 };
 
-const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: React.ComponentType<any>; skipBookmark?: boolean }> = [
-  { test: t => t.includes('dfs') || t.includes('lineup'),                                                                              Component: DFSCard },
+const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: React.ComponentType<any>; skipBookmark?: boolean; skipEstimated?: boolean }> = [
+  { test: t => t.includes('dfs') || t.includes('lineup'),                                                                              Component: DFSCard, skipEstimated: true },
   { test: t => t.includes('fantasy') || t.includes('draft') || t.includes('sleeper'),                                                 Component: FantasyCard, skipBookmark: true },
   { test: t => t.includes('kalshi') || t.includes('prediction'),                                                                      Component: KalshiCard },
   { test: t => t.includes('weather') || t.includes('climate'),                                                                        Component: WeatherCard },
@@ -92,7 +92,7 @@ const PATTERN_STD_REGISTRY: Array<{ test: (t: string) => boolean; Component: Rea
   // before this table is ever reached. An entry here would be dead code.
   { test: t => t === 'moneyline-value' || t === 'totals-value',                                                                        Component: BettingCard },
   { test: t => t === 'fantasy-insight' || t === 'bestball-stack' || t === 'auction-value',                                            Component: FantasyCard, skipBookmark: true },
-  { test: t => t.includes('dfs-value') || t.includes('dfs-matchup') || t.includes('dfs-contrarian') || t.includes('dfs-strategy'),   Component: DFSCard },
+  { test: t => t.includes('dfs-value') || t.includes('dfs-matchup') || t.includes('dfs-contrarian') || t.includes('dfs-strategy'),   Component: DFSCard, skipEstimated: true },
   { test: t => t.includes('odds') || t.includes('betting') || t.includes('moneyline') || t.includes('spread') || t.includes('totals'), Component: BettingCard },
 ];
 
@@ -367,7 +367,7 @@ export function DynamicCardRenderer({
 
   // ── withOverlays: wraps any card with overlay badges + interactive buttons ──
 
-  function withOverlays(el: React.ReactElement, skipBookmark = false): React.ReactElement {
+  function withOverlays(el: React.ReactElement, skipBookmark = false, skipEstimated = false): React.ReactElement {
     return (
       <>
         <div
@@ -445,8 +445,8 @@ export function DynamicCardRenderer({
             </button>
           )}
 
-          {/* ESTIMATED badge */}
-          {isEstimated && (
+          {/* ESTIMATED badge — suppressed for cards that render their own status (e.g. DFSCard) */}
+          {isEstimated && !skipEstimated && (
             <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold backdrop-blur-sm pointer-events-none animate-badge-pop animate-delay-150" role="note" aria-label="Estimated data">
               <FlaskConical className="w-3 h-3" aria-hidden="true" />
               Estimated
@@ -534,7 +534,7 @@ export function DynamicCardRenderer({
   const cardType = safeCard.type.toLowerCase();
 
   // Renders a standard-props card (the majority share this prop shape).
-  function renderStd(Component: React.ComponentType<any>, skipBookmark = false): React.ReactElement {
+  function renderStd(Component: React.ComponentType<any>, skipBookmark = false, skipEstimated = false): React.ReactElement {
     return withOverlays(
       <Component
         type={safeCard.type}
@@ -550,6 +550,7 @@ export function DynamicCardRenderer({
         isHero={isHero}
       />,
       skipBookmark,
+      skipEstimated,
     );
   }
 
@@ -657,8 +658,8 @@ export function DynamicCardRenderer({
 
   // ── Standard registry lookup (exact → pattern → fallback) ─────────────────
   if (cardType in EXACT_STD_REGISTRY) return renderStd(EXACT_STD_REGISTRY[cardType]);
-  for (const { test, Component, skipBookmark } of PATTERN_STD_REGISTRY) {
-    if (test(cardType)) return renderStd(Component, skipBookmark);
+  for (const { test, Component, skipBookmark, skipEstimated } of PATTERN_STD_REGISTRY) {
+    if (test(cardType)) return renderStd(Component, skipBookmark, skipEstimated);
   }
   if (process.env.NODE_ENV === 'development') {
     console.warn(`[DynamicCardRenderer] Unknown card type "${safeCard.type}" — falling back to BettingCard.`);

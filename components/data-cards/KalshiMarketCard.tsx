@@ -18,6 +18,8 @@ export interface KalshiMarket {
   status: string;
   priceIsReal: boolean;
   category?: string;
+  seriesTicker?: string;
+  eventTicker?: string;
 }
 
 interface KalshiMarketCardProps {
@@ -172,7 +174,7 @@ export function KalshiMarketCard({ market, onAsk }: KalshiMarketCardProps) {
         {/* CTAs */}
         <div className="flex gap-2 mt-auto pt-1">
           <a
-            href={`https://kalshi.com/markets/${market.ticker}`}
+            href={`https://kalshi.com/markets/${(market.seriesTicker || market.ticker.split('-')[0]).toLowerCase()}/${market.ticker.toLowerCase()}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 text-center text-[11px] font-black text-white bg-fuchsia-600/80 hover:bg-fuchsia-600 border border-fuchsia-500/40 hover:border-fuchsia-400/60 rounded-xl py-2 transition-all duration-150"

@@ -45,9 +45,10 @@ const DATE_RANGES: DateRange[] = ['1D', '1W', '1M', 'ALL'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildTradeUrl(ticker: string, eventTicker?: string): string {
-  if (eventTicker) return `https://kalshi.com/markets/${eventTicker}/${ticker}`;
-  return `https://kalshi.com/markets/${ticker}`;
+function buildTradeUrl(ticker: string, seriesTicker?: string, eventTicker?: string): string {
+  // Kalshi's URL format: /markets/{series_ticker}/{market_ticker}
+  const series = seriesTicker || (eventTicker ? eventTicker.split('-')[0] : null) || ticker.split('-')[0];
+  return `https://kalshi.com/markets/${series.toLowerCase()}/${ticker.toLowerCase()}`;
 }
 
 function smoothCurve(pts: Array<{ x: number; y: number }>): string {
@@ -267,7 +268,7 @@ export const KalshiDetailModal = memo(function KalshiDetailModal({ market, onClo
   }, [market.outcomes, history]);
 
   const selectedOutcome = enrichedOutcomes[selectedOutcomeIdx] ?? enrichedOutcomes[0];
-  const tradeUrl = buildTradeUrl(market.ticker, market.eventTicker);
+  const tradeUrl = buildTradeUrl(market.ticker, market.seriesTicker, market.eventTicker);
   const displayedOutcomes = showAll ? enrichedOutcomes : enrichedOutcomes.slice(0, 6);
 
   const obSide = activeView === 'tradeYes' ? 'yes' : 'no';

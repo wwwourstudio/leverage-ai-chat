@@ -38,6 +38,7 @@ interface KalshiMarket {
   priceChange: number;
   status:      string;
   eventTicker: string;
+  seriesTicker?: string;
 }
 
 interface MarketsResponse {
@@ -70,8 +71,8 @@ function timeLeft(closeTime: string): string {
 }
 
 function kalshiUrl(market: KalshiMarket): string {
-  const event  = market.eventTicker || market.ticker;
-  return `https://kalshi.com/markets/${event}/${market.ticker}`;
+  const series = market.seriesTicker || (market.eventTicker || market.ticker).split('-')[0];
+  return `https://kalshi.com/markets/${series.toLowerCase()}/${market.ticker.toLowerCase()}`;
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────

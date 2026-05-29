@@ -23,6 +23,7 @@ export interface KalshiTileData {
   isLive: boolean;
   liveStatus?: string;
   eventTicker?: string;
+  seriesTicker?: string;
   closeTimeIso?: string;
   subcategoryLabel?: string;
   iconCode?: string;

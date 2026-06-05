@@ -161,13 +161,15 @@ export async function GET(request: NextRequest) {
       ? HTTP_STATUS.OK
       : result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED
         ? HTTP_STATUS.SERVICE_UNAVAILABLE
-        : HTTP_STATUS.BAD_REQUEST;
+        : (result.error?.includes('Unknown sport') || result.error?.includes('No sport'))
+          ? HTTP_STATUS.BAD_REQUEST
+          : HTTP_STATUS.INTERNAL_ERROR;
     return NextResponse.json(result, { status });
   } catch (error) {
     console.error('[API/odds GET] Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR, events: [], timestamp: new Date().toISOString() },
-      { status: HTTP_STATUS.BAD_REQUEST },
+      { status: HTTP_STATUS.INTERNAL_ERROR },
     );
   }
 }
@@ -193,7 +195,9 @@ export async function POST(request: NextRequest) {
       ? HTTP_STATUS.OK
       : result.error === ERROR_MESSAGES.ODDS_NOT_CONFIGURED
         ? HTTP_STATUS.SERVICE_UNAVAILABLE
-        : HTTP_STATUS.BAD_REQUEST;
+        : (result.error?.includes('Unknown sport') || result.error?.includes('No sport'))
+          ? HTTP_STATUS.BAD_REQUEST
+          : HTTP_STATUS.INTERNAL_ERROR;
     return NextResponse.json(result, { status });
   } catch (error) {
     console.error('[API/odds] Error:', error);
@@ -204,7 +208,7 @@ export async function POST(request: NextRequest) {
         events: [],
         timestamp: new Date().toISOString(),
       },
-      { status: HTTP_STATUS.BAD_REQUEST },
+      { status: HTTP_STATUS.INTERNAL_ERROR },
     );
   }
 }

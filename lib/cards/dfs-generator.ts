@@ -59,6 +59,11 @@ const DFS_ROSTER: Record<string, Array<{ pos: string; scale: number; sf: number 
 };
 
 // 2025-26 season player pools per sport/position
+// ── Keep injury-sidelined players out of this pool — update as rosters change ──
+const INJURED_OUT: Set<string> = new Set([
+  'Aaron Judge',       // IL — Yankees OF (Jun 2026)
+]);
+
 const DFS_PLAYERS: Record<string, Record<string, string[]>> = {
   baseball_mlb: {
     SP:   ['Zack Wheeler', 'Logan Webb', 'Corbin Burnes', 'Freddy Peralta', 'Pablo López', 'Tyler Glasnow', 'Kevin Gausman', 'Chris Sale'],
@@ -67,7 +72,7 @@ const DFS_PLAYERS: Record<string, Record<string, string[]>> = {
     '2B': ['José Altuve', 'Marcus Semien', 'Jazz Chisholm Jr.', 'Gleyber Torres', 'Andrés Giménez'],
     '3B': ['Manny Machado', 'Austin Riley', 'Rafael Devers', 'Nolan Arenado', 'José Ramírez'],
     SS:   ['Bobby Witt Jr.', 'Gunnar Henderson', 'Elly De La Cruz', 'Trea Turner', 'Jeremy Peña'],
-    OF:   ['Aaron Judge', 'Juan Soto', 'Mookie Betts', 'Ronald Acuña Jr.', 'Kyle Tucker', 'Julio Rodríguez', 'Yordan Alvarez', 'Randy Arozarena'],
+    OF:   ['Juan Soto', 'Mookie Betts', 'Ronald Acuña Jr.', 'Kyle Tucker', 'Julio Rodríguez', 'Yordan Alvarez', 'Jackson Merrill', 'James Wood', 'Steven Kwan', 'Teoscar Hernández'],
     UTIL: ['Shohei Ohtani', 'Bryce Harper', 'José Ramírez', 'Jorge Soler', 'Matt Olson'],
   },
   basketball_nba: {
@@ -177,11 +182,13 @@ function buildLineup(
       const tWord = (g.homeWinProb >= 0.5 ? g.homeTeam : g.awayTeam).split(' ').pop() ?? '';
       playerName = pitcherByTeam.get(tWord) ?? pool[ct % Math.max(1, pool.length)] ?? `${tWord} SP`;
     } else {
-      let idx = ct % Math.max(1, pool.length);
-      for (let t = 0; t < pool.length && usedNames.has(pool[idx]); t++) {
-        idx = (idx + 1) % pool.length;
+      // Filter injured players and already-used names
+      const eligible = pool.filter(p => !INJURED_OUT.has(p));
+      let idx = ct % Math.max(1, eligible.length);
+      for (let t = 0; t < eligible.length && usedNames.has(eligible[idx]); t++) {
+        idx = (idx + 1) % eligible.length;
       }
-      playerName = pool[idx] ?? `${slot.pos} Starter`;
+      playerName = eligible[idx] ?? pool[ct % Math.max(1, pool.length)] ?? `${slot.pos} Starter`;
     }
     usedNames.add(playerName);
 
